@@ -24,7 +24,7 @@ api_key = os.getenv('BINANCE_API_KEY')
 api_secret = os.getenv('BINANCE_API_SECRET')
 
 if not api_key or not api_secret:
-    logger.error("API Key ou API Secret não encontrada. Verifique o arquivo .env")
+    logger.error("API Key ou API Secret não encontrada. Verifique o arquivo .env.")
     exit(1)
 
 client = Client(api_key, api_secret)
@@ -38,22 +38,22 @@ def calculate_percentage(current_price, target_price):
     return (target_price - current_price) / current_price * 100
 
 def read_state():
-    if os.path.exists('bot_state.txt'):
-        with open('bot_state.txt', 'r') as file:
+    if os.path.exists('data/bot_state.txt'):
+        with open('data/bot_state.txt', 'r') as file:
             state = file.read().strip()
         if state == 'comprado':
             return True, read_trade_history()
     return False, pd.DataFrame()
 
 def save_state(comprado, transaction_history=None):
-    with open('bot_state.txt', 'w') as file:
+    with open('data/bot_state.txt', 'w') as file:
         file.write('comprado' if comprado else 'não comprado')
     if transaction_history is not None:
-        transaction_history.to_csv('trade_history.csv', index=False)
+        transaction_history.to_csv('data/trade_history.csv', index=False)
 
 def read_trade_history():
-    if os.path.exists('trade_history.csv'):
-        df = pd.read_csv('trade_history.csv')
+    if os.path.exists('data/trade_history.csv'):
+        df = pd.read_csv('data/trade_history.csv')
         if not df.empty:
             return df
     return pd.DataFrame()
@@ -61,7 +61,7 @@ def read_trade_history():
 def update_trade_history(df, sell_price):
     df.at[df.index[-1], 'valor_venda'] = sell_price
     df.at[df.index[-1], 'outcome'] = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
-    df.to_csv('trade_history.csv', index=False)
+    df.to_csv('data/trade_history.csv', index=False)
 
 def is_ema_declining(data):
     """
