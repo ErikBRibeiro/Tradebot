@@ -15,8 +15,6 @@ services:
       - "8000:8000"
     networks:
       - trade_bot
-      #    depends_on:
-      #      - prometheus
 
   anaconda:
     container_name: trade_bot_anaconda
@@ -44,8 +42,4 @@ networks:
   trade_bot:
     driver: bridge
 
-#volumes:
-#  trade_bot_prometheus:
-#    external: true
-#  trade_bot_grafana:
-#    external: true
+
