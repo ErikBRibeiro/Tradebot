@@ -1,0 +1,2 @@
+horario_compra,horario_venda,moeda,valor_compra,valor_venda,quantidade_moeda,max_referencia,min_referencia,stoploss,stopgain,potential_loss,potential_gain,timeframe,setup,outcome
+2024-05-15 03:02:00.900235,2024-05-15 14:42:44,BTCUSDT,61770.0,63115.23,0.0011,61760.04,61432.01,61432.01,62995.2408,-0.5471750040472688,1.9835531811559004,1h,9.1,2.17780475959204
