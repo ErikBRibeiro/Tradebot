@@ -25,4 +25,6 @@ COPY --from=anaconda-build /opt/notebooks/tradebot_alpha.py .
 
 RUN mkdir data
 
+EXPOSE 8000
+
 CMD ["python", "tradebot_alpha.py"]
