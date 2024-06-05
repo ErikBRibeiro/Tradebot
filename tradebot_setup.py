@@ -1,0 +1,122 @@
+import pandas as pd
+from datetime import datetime
+from binance import Client
+from prometheus_client import Gauge, Counter, Histogram, Summary
+
+def initialize_metrics():
+    # Métricas Prometheus
+    metrics = {
+        'current_price_metric': Gauge('trade_bot_current_price', 'Current price of the asset', ['currency']),
+        'current_high_price_metric': Gauge('trade_bot_current_high_price', 'Current high price of the asset', ['currency']),
+        'current_low_price_metric': Gauge('trade_bot_current_low_price', 'Current low price of the asset', ['currency']),
+        'current_volume_metric': Gauge('trade_bot_current_volume', 'Current trading volume', ['currency']),
+        'price_standard_deviation_metric': Gauge('trade_bot_price_standard_deviation', 'Standard deviation of closing prices', ['currency']),
+        'buy_duration_metric': Histogram('trade_bot_buy_duration_seconds', 'Duration of buy transactions in seconds', ['currency']),
+        'current_stoploss_metric': Gauge('trade_bot_current_stoploss', 'Current stoploss value', ['currency']),
+        'current_stopgain_metric': Gauge('trade_bot_current_stopgain', 'Current stopgain value', ['currency']),
+        'last_buy_price_metric': Gauge('trade_bot_last_buy_price', 'Last buy price', ['currency']),
+        'buy_attempts_metric': Counter('trade_bot_buy_attempts', 'Number of buy attempts', ['currency']),
+        'successful_buys_metric': Counter('trade_bot_successful_buys', 'Number of successful buys', ['currency']),
+        'buy_price_spread_metric': Gauge('trade_bot_buy_price_spread', 'Spread between buy prices', ['currency']),
+        'potential_loss_metric': Gauge('trade_bot_potential_loss', 'Potential loss of current buy', ['currency']),
+        'potential_gain_metric': Gauge('trade_bot_potential_gain', 'Potential gain of current buy', ['currency']),
+        'last_sell_price_metric': Gauge('trade_bot_last_sell_price', 'Last sell price', ['currency']),
+        'successful_sells_metric': Counter('trade_bot_successful_sells', 'Number of successful sells', ['currency']),
+        'sell_duration_metric': Histogram('trade_bot_sell_duration_seconds', 'Duration of sell transactions in seconds', ['currency']),
+        'transaction_outcome_metric': Summary('trade_bot_transaction_outcome', 'Transaction outcomes (gain/loss)', ['currency']),
+        'sell_price_spread_metric': Gauge('trade_bot_sell_price_spread', 'Spread between sell prices', ['currency']),
+        'total_trades_metric': Counter('trade_bot_total_trades', 'Total number of trades', ['currency']),
+        'total_loss_metric': Gauge('trade_bot_total_loss', 'Total loss accumulated', ['currency']),
+        'trade_volume_metric': Gauge('trade_bot_trade_volume', 'Total volume of trades', ['currency']),
+        'success_rate_metric': Gauge('trade_bot_success_rate', 'Success rate of trades', ['currency']),
+        'total_profit_metric': Gauge('trade_bot_total_profit', 'Total profit accumulated', ['currency']),
+        'average_trade_duration_metric': Gauge('trade_bot_average_trade_duration', 'Average duration of trades', ['currency']),
+        'profit_factor_metric': Gauge('trade_bot_profit_factor', 'Profit factor (total profit / total loss)', ['currency'])
+    }
+    return metrics
+
+def update_metrics_on_buy(metrics, current_price, stoploss, stopgain, potential_loss, potential_gain, symbol):
+    metrics['current_stoploss_metric'].labels(symbol).set(stoploss)
+    metrics['current_stopgain_metric'].labels(symbol).set(stopgain)
+    metrics['last_buy_price_metric'].labels(symbol).set(current_price)
+    metrics['buy_attempts_metric'].labels(symbol).inc()
+    metrics['successful_buys_metric'].labels(symbol).inc()
+    metrics['buy_price_spread_metric'].labels(symbol).set(potential_gain - potential_loss)
+    metrics['potential_loss_metric'].labels(symbol).set(potential_loss)
+    metrics['potential_gain_metric'].labels(symbol).set(potential_gain)
+
+def update_metrics_on_sell(metrics, ticker, symbol):
+    metrics['last_sell_price_metric'].labels(symbol).set(ticker)
+    metrics['successful_sells_metric'].labels(symbol).inc()
+    metrics['sell_price_spread_metric'].labels(symbol).set(ticker)
+
+def buy_condition(data, ema_span):
+    previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-2]
+    pre_previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-3]
+    current_price = data['close'].iloc[-1]
+    previous_high = data['high'].iloc[-2]
+    return previous_ema > pre_previous_ema and current_price >= previous_high, current_price, previous_high
+
+
+def sell_condition(ticker, stoploss, stopgain):
+    return ticker <= stoploss or ticker >= stopgain
+
+def process_buy(client, symbol, quantity, data, interval, setup, trade_history, stopgain_percentage):
+    buy_prices = []
+    start_time = datetime.now()
+    order = client.order_market_buy(symbol=symbol, quantity=quantity)
+    buy_duration = (datetime.now() - start_time).total_seconds()
+    stoploss = data['low'].iloc[-2]
+    stopgain = data['high'].iloc[-2] * (1 + stopgain_percentage / 100)
+    current_price = data['close'].iloc[-1]
+    potential_loss = (stoploss - current_price) / current_price * 100
+    potential_gain = (stopgain - current_price) / current_price * 100
+    new_row = pd.DataFrame({
+        'horario': [datetime.now()],
+        'moeda': [symbol],
+        'valor_compra': [current_price],
+        'valor_venda': [None],
+        'quantidade_moeda': [quantity],
+        'max_referencia': [data['high'].iloc[-2]],
+        'min_referencia': [data['low'].iloc[-2]],
+        'stoploss': [stoploss],
+        'stopgain': [stopgain],
+        'potential_loss': [potential_loss],
+        'potential_gain': [potential_gain],
+        'timeframe': [interval],
+        'setup': [setup],
+        'outcome': [None]
+    })
+    trade_history = pd.concat([trade_history, new_row], ignore_index=True)
+    trade_history.to_csv('data/trade_history.csv', index=False)
+    buy_prices.append(current_price)
+    return trade_history, buy_prices, stoploss, stopgain, potential_loss, potential_gain, buy_duration
+
+
+def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history):
+    sell_prices = []
+    start_time = datetime.time()
+    if balance_btc > 0 and lot_size:
+        quantity_to_sell = (balance_btc // lot_size) * lot_size
+        if quantity_to_sell > 0:
+            quantity_to_sell = round(quantity_to_sell, 8)
+            order = client.order_market_sell(symbol=symbol, quantity=quantity_to_sell)
+            sell_duration = datetime.time() - start_time
+            update_trade_history(trade_history, ticker, symbol)
+            sell_prices.append(ticker)
+            return True, trade_history, sell_prices, sell_duration
+    return False, trade_history, sell_prices, 0
+
+def update_trade_history(trade_history, ticker, symbol):
+    trade_history.loc[trade_history['valor_venda'].isnull(), 'valor_venda'] = ticker
+    trade_history.loc[trade_history['outcome'].isnull(), 'outcome'] = "Success"
+    trade_history.to_csv('data/trade_history.csv', index=False)
+
+def safe_float_conversion(value):
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+def calculate_standard_deviation(prices):
+    return pd.Series(prices).std()
