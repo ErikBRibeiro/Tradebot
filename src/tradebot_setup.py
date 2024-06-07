@@ -1,7 +1,14 @@
 import pandas as pd
 from datetime import datetime
-from binance import Client
 from prometheus_client import Gauge, Counter, Histogram, Summary
+import os
+import logging
+import time
+from binance import Client, exceptions
+
+# Configure o logging (adicionar essa configuração no início do arquivo)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger()
 
 def initialize_metrics():
     # Métricas Prometheus
@@ -57,7 +64,6 @@ def buy_condition(data, ema_span):
     previous_high = data['high'].iloc[-2]
     return previous_ema > pre_previous_ema and current_price >= previous_high, current_price, previous_high
 
-
 def sell_condition(ticker, stoploss, stopgain):
     return ticker <= stoploss or ticker >= stopgain
 
@@ -112,6 +118,20 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     buy_prices.append(current_price)
     return trade_history, buy_prices, stoploss, stopgain, potential_loss, potential_gain, buy_duration
 
+def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history):
+    sell_prices = []
+    start_time = datetime.now()
+    if balance_btc > 0 and lot_size:
+        quantity_to_sell = (balance_btc // lot_size) * lot_size
+        if quantity_to_sell > 0:
+            quantity_to_sell = round(quantity_to_sell, 8)
+            order = client.order_market_sell(symbol=symbol, quantity=quantity_to_sell)
+            sell_duration = (datetime.now() - start_time).total_seconds()
+            update_trade_history(trade_history, ticker, symbol)
+            sell_prices.append(ticker)
+            return True, trade_history, sell_prices, sell_duration
+    return False, trade_history, sell_prices, 0
+
 def update_trade_history(trade_history, ticker, symbol):
     trade_history.loc[trade_history['valor_venda'].isnull(), 'valor_venda'] = ticker
     trade_history.loc[trade_history['outcome'].isnull(), 'outcome'] = "Success"
@@ -125,3 +145,68 @@ def safe_float_conversion(value):
 
 def calculate_standard_deviation(prices):
     return pd.Series(prices).std()
+
+def calculate_percentage(current_price, target_price):
+    return ((target_price - current_price) / current_price) * 100
+
+def get_current_balance(client, asset):
+    try:
+        balance_info = client.get_asset_balance(asset=asset)
+        return float(balance_info['free'])
+    except exceptions.BinanceAPIException as e:
+        logger.error(f"Erro na API Binance ao obter saldo: {e}")
+        return 0.0
+    except Exception as e:
+        logger.error(f"Erro inesperado ao obter saldo: {e}")
+        return 0.0
+
+def get_lot_size(client, symbol):
+    try:
+        info = client.get_symbol_info(symbol)
+        for f in info['filters']:
+            if (f['filterType'] == 'LOT_SIZE'):
+                return float(f['stepSize'])
+        return None
+    except exceptions.BinanceAPIException as e:
+        logger.error(f"Erro na API Binance ao obter LOT_SIZE: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Erro inesperado ao obter LOT_SIZE: {e}")
+        return None
+
+def read_trade_history():
+    if os.path.exists('data/trade_history.csv'):
+        df = pd.read_csv('data/trade_history.csv')
+        if not df.empty:
+            return df
+    return pd.DataFrame()
+
+def check_last_transaction(client, symbol):
+    try:
+        trades = client.get_my_trades(symbol=symbol, limit=5)
+        if not trades:
+            return False, pd.DataFrame()
+        trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
+        last_trade = trades_sorted[0]
+        is_buy = last_trade['isBuyer']
+        trade_history = read_trade_history()
+        return is_buy, trade_history
+    except exceptions.BinanceAPIException as e:
+        logger.error(f"Erro na API Binance: {e}")
+        time.sleep(25)
+        return check_last_transaction(client, symbol)
+    except Exception as e:
+        logger.error(f"Erro inesperado ao verificar a última transação: {e}")
+        time.sleep(25)
+        return check_last_transaction(client, symbol)
+
+def check_buy_conditions(data, ema_span):
+    previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-2]
+    pre_previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-3]
+    current_price = data['close'].iloc[-1]
+    previous_high = data['high'].iloc[-2]
+
+    average_volume_20 = data['volume'].rolling(window=20).mean().iloc[-1]
+    current_volume = data['volume'].iloc[-1]
+
+    return (previous_ema > pre_previous_ema and current_price >= previous_high and current_volume > average_volume_20), current_price, previous_high
