@@ -8,6 +8,7 @@ RUN mkdir /opt/notebooks && \
 WORKDIR /opt/notebooks
 
 COPY tradebot_alpha.ipynb .
+COPY src src
 
 RUN ["/opt/conda/bin/jupyter", "nbconvert", "--to", "script", "tradebot_alpha.ipynb" ]
 
@@ -22,6 +23,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --from=anaconda-build /opt/notebooks/tradebot_alpha.py .
+COPY --from=anaconda-build /opt/notebooks/src src
 
 RUN mkdir data
 
