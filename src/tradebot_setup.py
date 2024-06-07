@@ -32,7 +32,7 @@ def initialize_metrics():
         'sell_duration_metric': Histogram('trade_bot_sell_duration_seconds', 'Duration of sell transactions in seconds', ['currency']),
         'transaction_outcome_metric': Summary('trade_bot_transaction_outcome', 'Transaction outcomes (gain/loss)', ['currency']),
         'sell_price_spread_metric': Gauge('trade_bot_sell_price_spread', 'Spread between sell prices', ['currency']),
-        'total_trades_metric': Counter('trade_bot_total_trades', 'Total number of trades', [' currency']),
+        'total_trades_metric': Counter('trade_bot_total_trades', 'Total number of trades', ['currency']),
         'total_loss_metric': Gauge('trade_bot_total_loss', 'Total loss accumulated', ['currency']),
         'trade_volume_metric': Gauge('trade_bot_trade_volume', 'Total volume of trades', ['currency']),
         'success_rate_metric': Gauge('trade_bot_success_rate', 'Success rate of trades', ['currency']),
@@ -73,7 +73,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     order = client.order_market_buy(symbol=symbol, quantity=quantity)
     buy_duration = (datetime.now() - start_time).total_seconds()
     stoploss = data['low'].iloc[-2]
-    stopgain = data['high'].iloc[-2] * (1 + stopgain_percentage / 100)
+    stopgain = current_price * (1 + stopgain_percentage / 100)
     current_price = data['close'].iloc[-1]
     potential_loss = (stoploss - current_price) / current_price * 100
     potential_gain = (stopgain - current_price) / current_price * 100
