@@ -6,12 +6,12 @@ import logging
 import time
 from binance import Client, exceptions
 
-# Configure o logging (adicionar essa configuração no início do arquivo)
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
 def initialize_metrics():
-    # Métricas Prometheus
+    # Prometheus metrics
     metrics = {
         'current_price_metric': Gauge('trade_bot_current_price', 'Current price of the asset', ['currency']),
         'current_high_price_metric': Gauge('trade_bot_current_high_price', 'Current high price of the asset', ['currency']),
@@ -32,7 +32,7 @@ def initialize_metrics():
         'sell_duration_metric': Histogram('trade_bot_sell_duration_seconds', 'Duration of sell transactions in seconds', ['currency']),
         'transaction_outcome_metric': Summary('trade_bot_transaction_outcome', 'Transaction outcomes (gain/loss)', ['currency']),
         'sell_price_spread_metric': Gauge('trade_bot_sell_price_spread', 'Spread between sell prices', ['currency']),
-        'total_trades_metric': Counter('trade_bot_total_trades', 'Total number of trades', ['currency']),
+        'total_trades_metric': Counter('trade_bot_total_trades', 'Total number of trades', [' currency']),
         'total_loss_metric': Gauge('trade_bot_total_loss', 'Total loss accumulated', ['currency']),
         'trade_volume_metric': Gauge('trade_bot_trade_volume', 'Total volume of trades', ['currency']),
         'success_rate_metric': Gauge('trade_bot_success_rate', 'Success rate of trades', ['currency']),
@@ -95,7 +95,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
         'outcome': [None]
     })
 
-    # Garantir que o DataFrame resultante tenha os tipos de dados corretos
+    # Ensure the resulting DataFrame has the correct data types
     new_row = new_row.astype({
         'horario': 'datetime64[ns]',
         'moeda': 'object',
@@ -154,10 +154,10 @@ def get_current_balance(client, asset):
         balance_info = client.get_asset_balance(asset=asset)
         return float(balance_info['free'])
     except exceptions.BinanceAPIException as e:
-        logger.error(f"Erro na API Binance ao obter saldo: {e}")
+        logger.error(f"Error in Binance API while getting balance: {e}")
         return 0.0
     except Exception as e:
-        logger.error(f"Erro inesperado ao obter saldo: {e}")
+        logger.error(f"Unexpected error while getting balance: {e}")
         return 0.0
 
 def get_lot_size(client, symbol):
@@ -168,10 +168,10 @@ def get_lot_size(client, symbol):
                 return float(f['stepSize'])
         return None
     except exceptions.BinanceAPIException as e:
-        logger.error(f"Erro na API Binance ao obter LOT_SIZE: {e}")
+        logger.error(f"Error in Binance API while getting LOT_SIZE: {e}")
         return None
     except Exception as e:
-        logger.error(f"Erro inesperado ao obter LOT_SIZE: {e}")
+        logger.error(f"Unexpected error while getting LOT_SIZE: {e}")
         return None
 
 def read_trade_history():
@@ -192,11 +192,11 @@ def check_last_transaction(client, symbol):
         trade_history = read_trade_history()
         return is_buy, trade_history
     except exceptions.BinanceAPIException as e:
-        logger.error(f"Erro na API Binance: {e}")
+        logger.error(f"Error in Binance API: {e}")
         time.sleep(25)
         return check_last_transaction(client, symbol)
     except Exception as e:
-        logger.error(f"Erro inesperado ao verificar a última transação: {e}")
+        logger.error(f"Unexpected error while checking last transaction: {e}")
         time.sleep(25)
         return check_last_transaction(client, symbol)
 
