@@ -71,6 +71,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     current_price = data['close'].iloc[-1]
     potential_loss = (stoploss - current_price) / current_price * 100
     potential_gain = (stopgain - current_price) / current_price * 100
+    
     new_row = pd.DataFrame({
         'horario': [datetime.now()],
         'moeda': [symbol],
@@ -87,25 +88,29 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
         'setup': [setup],
         'outcome': [None]
     })
+
+    # Garantir que o DataFrame resultante tenha os tipos de dados corretos
+    new_row = new_row.astype({
+        'horario': 'datetime64[ns]',
+        'moeda': 'object',
+        'valor_compra': 'float64',
+        'valor_venda': 'float64',
+        'quantidade_moeda': 'float64',
+        'max_referencia': 'float64',
+        'min_referencia': 'float64',
+        'stoploss': 'float64',
+        'stopgain': 'float64',
+        'potential_loss': 'float64',
+        'potential_gain': 'float64',
+        'timeframe': 'object',
+        'setup': 'object',
+        'outcome': 'object'
+    })
+
     trade_history = pd.concat([trade_history, new_row], ignore_index=True)
     trade_history.to_csv('data/trade_history.csv', index=False)
     buy_prices.append(current_price)
     return trade_history, buy_prices, stoploss, stopgain, potential_loss, potential_gain, buy_duration
-
-
-def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history):
-    sell_prices = []
-    start_time = datetime.time()
-    if balance_btc > 0 and lot_size:
-        quantity_to_sell = (balance_btc // lot_size) * lot_size
-        if quantity_to_sell > 0:
-            quantity_to_sell = round(quantity_to_sell, 8)
-            order = client.order_market_sell(symbol=symbol, quantity=quantity_to_sell)
-            sell_duration = datetime.time() - start_time
-            update_trade_history(trade_history, ticker, symbol)
-            sell_prices.append(ticker)
-            return True, trade_history, sell_prices, sell_duration
-    return False, trade_history, sell_prices, 0
 
 def update_trade_history(trade_history, ticker, symbol):
     trade_history.loc[trade_history['valor_venda'].isnull(), 'valor_venda'] = ticker
