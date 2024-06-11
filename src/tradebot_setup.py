@@ -209,6 +209,4 @@ def check_buy_conditions(data, ema_span):
     average_volume_20 = data['volume'].rolling(window=20).mean().iloc[-1]
     current_volume = data['volume'].iloc[-1]
 
-    logger.info(f"Previous EMA: {previous_ema}, Pre-Previous EMA: {pre_previous_ema}, Current Price: {current_price}, Previous High: {previous_high}")
-
     return (previous_ema > pre_previous_ema and current_price >= previous_high and current_volume > average_volume_20), current_price, previous_high
