@@ -4,8 +4,6 @@ from prometheus_client import Gauge, Counter, Histogram, Summary
 import os
 import logging
 from binance import exceptions
-import time
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -80,7 +78,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     potential_gain = (stopgain - current_price) / current_price * 100
     
     logger.info(f"Bought - Potential loss: {potential_loss:.2f}%, Potential gain: {potential_gain:.2f}%")
-    logger.info(f"Ticker: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}")
+    logger.info(f"Previous EMA: {data['close'].ewm(span=9, adjust=False).mean().iloc[-2]}, Pre-Previous EMA: {data['close'].ewm(span=9, adjust=False).mean().iloc[-3]}, Current Price: {current_price}, Previous High: {data['high'].iloc[-2]}")
 
     new_row = pd.DataFrame({
         'horario': [datetime.now()],
@@ -170,32 +168,35 @@ def read_trade_history():
             return df
     return pd.DataFrame()
 
-def check_last_transaction(client, symbol):
-    try:
-        trades = client.get_my_trades(symbol=symbol, limit=5)
-        if not trades:
-            return False, pd.DataFrame()
-        trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
-        last_trade = trades_sorted[0]
-        is_buy = last_trade['isBuyer']
-        trade_history = read_trade_history()
-        return is_buy, trade_history
-    except exceptions.BinanceAPIException as e:
-        logger.error(f"Error in Binance API: {e}")
-        time.sleep(25)
-        return check_last_transaction(client, symbol)
-    except Exception as e:
-        logger.error(f"Unexpected error while checking last transaction: {e}")
-        time.sleep(25)
-        return check_last_transaction(client, symbol)
+def calculate_profit_factor(total_profit, total_loss):
+    return total_profit / abs(total_loss) if total_loss != 0 else float('inf')
 
-def check_buy_conditions(data, ema_span):
-    previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-2]
-    pre_previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-3]
-    current_price = data['close'].iloc[-1]
-    previous_high = data['high'].iloc[-2]
 
-    average_volume_20 = data['volume'].rolling(window=20).mean().iloc[-1]
-    current_volume = data['volume'].iloc[-1]
+def update_trade_history(df, sell_price, symbol, metrics):
+    global total_profit, total_loss, total_trade_duration, successful_trades, total_trades, total_trade_volume, buy_prices, sell_prices
 
-    return (previous_ema > pre_previous_ema and current_price >= previous_high and current_volume > average_volume_20), current_price, previous_high
+    df.at[df.index[-1], 'valor_venda'] = sell_price
+    outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
+    df.at[df.index[-1], 'outcome'] = outcome
+    df.to_csv('data/trade_history.csv', index=False)
+    metrics['transaction_outcome_metric'].labels(symbol).observe(outcome)
+
+    if outcome > 0:
+        total_profit += outcome
+        successful_trades += 1
+    else:
+        total_loss += outcome
+
+    total_trades += 1
+    total_trade_volume += df['quantidade_moeda'].iloc[-1]
+    sell_prices.append(sell_price)
+    metrics['total_profit_metric'].labels(symbol).set(total_profit)
+    metrics['total_loss_metric'].labels(symbol).set(total_loss)
+    success_rate = (successful_trades / total_trades) * 100 if total_trades > 0 else 0
+    metrics['success_rate_metric'].labels(symbol).set(success_rate)
+    metrics['total_trades_metric'].labels(symbol).inc()
+    average_trade_duration = total_trade_duration / total_trades if total_trades > 0 else 0
+    metrics['average_trade_duration_metric'].labels(symbol).set(average_trade_duration)
+    metrics['trade_volume_metric'].labels(symbol).set(total_trade_volume)
+    metrics['average_sell_price_metric'].labels(symbol).set(sum(sell_prices) / len(sell_prices))
+    metrics['profit_factor_metric'].labels(symbol).set(calculate_profit_factor(total_profit, total_loss))
