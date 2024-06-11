@@ -3,8 +3,9 @@ from datetime import datetime
 from prometheus_client import Gauge, Counter, Histogram, Summary
 import os
 import logging
+from binance import exceptions
 import time
-from binance import Client, exceptions
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -67,17 +68,20 @@ def buy_condition(data, ema_span):
 def sell_condition(ticker, stoploss, stopgain):
     return ticker <= stoploss or ticker >= stopgain
 
-def process_buy(client, symbol, quantity, data, interval, setup, trade_history, stopgain_percentage):
+def process_buy(client, symbol, quantity, data, interval, setup, trade_history, stopgain_percentage, metrics):
     buy_prices = []
     start_time = datetime.now()
     order = client.order_market_buy(symbol=symbol, quantity=quantity)
     buy_duration = (datetime.now() - start_time).total_seconds()
+    current_price = data['close'].iloc[-1]
     stoploss = data['low'].iloc[-2]
     stopgain = current_price * (1 + stopgain_percentage / 100)
-    current_price = data['close'].iloc[-1]
     potential_loss = (stoploss - current_price) / current_price * 100
     potential_gain = (stopgain - current_price) / current_price * 100
     
+    logger.info(f"Bought - Potential loss: {potential_loss:.2f}%, Potential gain: {potential_gain:.2f}%")
+    logger.info(f"Ticker: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}")
+
     new_row = pd.DataFrame({
         'horario': [datetime.now()],
         'moeda': [symbol],
@@ -95,30 +99,15 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
         'outcome': [None]
     })
 
-    # Ensure the resulting DataFrame has the correct data types
-    new_row = new_row.astype({
-        'horario': 'datetime64[ns]',
-        'moeda': 'object',
-        'valor_compra': 'float64',
-        'valor_venda': 'float64',
-        'quantidade_moeda': 'float64',
-        'max_referencia': 'float64',
-        'min_referencia': 'float64',
-        'stoploss': 'float64',
-        'stopgain': 'float64',
-        'potential_loss': 'float64',
-        'potential_gain': 'float64',
-        'timeframe': 'object',
-        'setup': 'object',
-        'outcome': 'object'
-    })
-
     trade_history = pd.concat([trade_history, new_row], ignore_index=True)
     trade_history.to_csv('data/trade_history.csv', index=False)
     buy_prices.append(current_price)
+    
+    update_metrics_on_buy(metrics, current_price, stoploss, stopgain, potential_loss, potential_gain, symbol)
+    
     return trade_history, buy_prices, stoploss, stopgain, potential_loss, potential_gain, buy_duration
 
-def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history):
+def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history, metrics):
     sell_prices = []
     start_time = datetime.now()
     if balance_btc > 0 and lot_size:
@@ -127,15 +116,15 @@ def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history):
             quantity_to_sell = round(quantity_to_sell, 8)
             order = client.order_market_sell(symbol=symbol, quantity=quantity_to_sell)
             sell_duration = (datetime.now() - start_time).total_seconds()
-            update_trade_history(trade_history, ticker, symbol)
+            logger.info("Venda realizada.")
+            logger.info(f"Ticker: {ticker}, Stoploss: {trade_history['stoploss'].iloc[-1]}, Stopgain: {trade_history['stopgain'].iloc[-1]}")
+            trade_history.loc[trade_history['valor_venda'].isnull(), 'valor_venda'] = ticker
+            trade_history.loc[trade_history['outcome'].isnull(), 'outcome'] = "Success"
+            trade_history.to_csv('data/trade_history.csv', index=False)
             sell_prices.append(ticker)
+            update_metrics_on_sell(metrics, ticker, symbol)
             return True, trade_history, sell_prices, sell_duration
     return False, trade_history, sell_prices, 0
-
-def update_trade_history(trade_history, ticker, symbol):
-    trade_history.loc[trade_history['valor_venda'].isnull(), 'valor_venda'] = ticker
-    trade_history.loc[trade_history['outcome'].isnull(), 'outcome'] = "Success"
-    trade_history.to_csv('data/trade_history.csv', index=False)
 
 def safe_float_conversion(value):
     try:
