@@ -4,6 +4,7 @@ from prometheus_client import Gauge, Counter, Histogram, Summary
 import os
 import logging
 from binance import exceptions
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -200,3 +201,22 @@ def update_trade_history(df, sell_price, symbol, metrics):
     metrics['trade_volume_metric'].labels(symbol).set(total_trade_volume)
     metrics['average_sell_price_metric'].labels(symbol).set(sum(sell_prices) / len(sell_prices))
     metrics['profit_factor_metric'].labels(symbol).set(calculate_profit_factor(total_profit, total_loss))
+
+def check_last_transaction(client, symbol):
+    try:
+        trades = client.get_my_trades(symbol=symbol, limit=5)
+        if not trades:
+            return False, pd.DataFrame()
+        trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
+        last_trade = trades_sorted[0]
+        is_buy = last_trade['isBuyer']
+        trade_history = read_trade_history()
+        return is_buy, trade_history
+    except exceptions.BinanceAPIException as e:
+        logger.error(f"Erro na API Binance: {e}")
+        time.sleep(25)
+        return check_last_transaction(client, symbol)
+    except Exception as e:
+        logger.error(f"Erro inesperado ao verificar a última transação: {e}")
+        time.sleep(25)
+        return check_last_transaction(client, symbol)
