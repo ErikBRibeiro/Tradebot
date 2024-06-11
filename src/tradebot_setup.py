@@ -10,6 +10,16 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
+# Definição de variáveis globais para métricas
+total_profit = 0
+total_loss = 0
+total_trade_duration = 0
+successful_trades = 0
+total_trades = 0
+total_trade_volume = 0
+buy_prices = []
+sell_prices = []
+
 def initialize_metrics():
     # Prometheus metrics
     metrics = {
@@ -137,6 +147,9 @@ def calculate_standard_deviation(prices):
 def calculate_percentage(current_price, target_price):
     return ((target_price - current_price) / current_price) * 100
 
+def calculate_profit_factor(total_profit, total_loss):
+    return total_profit / abs(total_loss) if total_loss != 0 else float('inf')
+
 def get_current_balance(client, asset):
     try:
         balance_info = client.get_asset_balance(asset=asset)
@@ -169,13 +182,8 @@ def read_trade_history():
             return df
     return pd.DataFrame()
 
-def calculate_profit_factor(total_profit, total_loss):
-    return total_profit / abs(total_loss) if total_loss != 0 else float('inf')
-
-
 def update_trade_history(df, sell_price, symbol, metrics):
     global total_profit, total_loss, total_trade_duration, successful_trades, total_trades, total_trade_volume, buy_prices, sell_prices
-
     df.at[df.index[-1], 'valor_venda'] = sell_price
     outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
     df.at[df.index[-1], 'outcome'] = outcome
@@ -220,3 +228,14 @@ def check_last_transaction(client, symbol):
         logger.error(f"Erro inesperado ao verificar a última transação: {e}")
         time.sleep(25)
         return check_last_transaction(client, symbol)
+
+def check_buy_conditions(data, ema_span):
+    previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-2]
+    pre_previous_ema = data['close'].ewm(span=ema_span, adjust=False).mean().iloc[-3]
+    current_price = data['close'].iloc[-1]
+    previous_high = data['high'].iloc[-2]
+
+    average_volume_20 = data['volume'].rolling(window=20).mean().iloc[-1]
+    current_volume = data['volume'].iloc[-1]
+
+    return (previous_ema > pre_previous_ema and current_price >= previous_high and current_volume > average_volume_20), current_price, previous_high
