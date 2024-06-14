@@ -4,6 +4,8 @@ from datetime import datetime
 import requests
 import time
 
+# TODO: ADICIONAR SALDO E PERCENTUAL MÉDIO DE GANHO NOS REPORTS
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -94,14 +96,22 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
             continue
     elif comprado:
-        if data['low'].iloc[i - 1] <= stoploss:
+        if data['low'].iloc[i - 1] <= data['low'].iloc[i - 2]:
             # loss_percentage = (buy_price - data['low'].iloc[i - 2]) / buy_price * 100
-            loss_percentage = calculate_loss_percentage(buy_price, stoploss)
-            results[year][month]['failed_trades'] += 1
-            results[year][month]['perda_percentual_total'] += loss_percentage
-            comprado = False
-            # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
-            continue
+            if data['close'].iloc[i - 1] < buy_price:
+                loss_percentage = calculate_loss_percentage(buy_price, stoploss)
+                results[year][month]['failed_trades'] += 1
+                results[year][month]['perda_percentual_total'] += loss_percentage
+                comprado = False
+                # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
+                continue
+            elif data['close'].iloc[i - 1] >= buy_price:
+                profit = calculate_gain_percentage(buy_price, stopgain)
+                results[year][month]['lucro'] += profit
+                results[year][month]['successful_trades'] += 1
+                comprado = False
+                # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
+                continue
         elif data['close'].iloc[i - 1] >= stopgain:
             # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
             profit = calculate_gain_percentage(buy_price, stopgain)
@@ -140,24 +150,24 @@ for year in results:
 
     print(f"  Perda média por trade: {avg_loss_per_trade}")
     print(f"  Resultado final: {sum([results[year][month]['lucro'] - results[year][month]['perda_percentual_total'] for month in results[year]])}")
-    # print("Detalhes:")
-    # for month in results[year]:
-    #     print(f"  Mês: {month}")
-    #     print(f"    Operações realizadas: {results[year][month]['open_trades']}")
-    #     print(f"    Trades de sucesso: {results[year][month]['successful_trades']}")
-    #     print(f"    Lucro obtido: {results[year][month]['lucro']}")
-    #     print(f"    Trades em prejuízo: {results[year][month]['failed_trades']}")
-    #     print(f"    Perda total: {results[year][month]['perda_percentual_total']}")
+    print("Detalhes:")
+    for month in results[year]:
+        print(f"  Mês: {month}")
+        print(f"    Operações realizadas: {results[year][month]['open_trades']}")
+        print(f"    Trades de sucesso: {results[year][month]['successful_trades']}")
+        print(f"    Lucro obtido: {results[year][month]['lucro']}")
+        print(f"    Trades em prejuízo: {results[year][month]['failed_trades']}")
+        print(f"    Perda total: {results[year][month]['perda_percentual_total']}")
         
-    #     failed_trades = results[year][month]['failed_trades']
-    #     if failed_trades != 0:
-    #         avg_loss_per_trade = results[year][month]['perda_percentual_total'] / failed_trades
-    #     else:
-    #         avg_loss_per_trade = 0  # or any other value you want to return when there are no failed trades
+        failed_trades = results[year][month]['failed_trades']
+        if failed_trades != 0:
+            avg_loss_per_trade = results[year][month]['perda_percentual_total'] / failed_trades
+        else:
+            avg_loss_per_trade = 0  # or any other value you want to return when there are no failed trades
 
-    #     print(f"    Perda média por trade: {avg_loss_per_trade}")
-    #     print(f"    Resultado final: {results[year][month]['lucro'] - results[year][month]['perda_percentual_total']}")
-    #     print("-------------------")
+        print(f"    Perda média por trade: {avg_loss_per_trade}")
+        print(f"    Resultado final: {results[year][month]['lucro'] - results[year][month]['perda_percentual_total']}")
+        print("-------------------")
 
 print("Total:")
 print(f"Operações realizadas: {sum([results[year][month]['open_trades'] for year in results for month in results[year]])}")
