@@ -48,11 +48,12 @@ def initialize_metrics():
         'success_rate_metric': Gauge('trade_bot_success_rate', 'Success rate of trades', ['currency']),
         'total_profit_metric': Gauge('trade_bot_total_profit', 'Total profit accumulated', ['currency']),
         'average_trade_duration_metric': Gauge('trade_bot_average_trade_duration', 'Average duration of trades', ['currency']),
-        'profit_factor_metric': Gauge('trade_bot_profit_factor', 'Profit factor (total profit / total loss)', ['currency'])
+        'profit_factor_metric': Gauge('trade_bot_profit_factor', 'Profit factor (total profit / total loss)', ['currency']),
+        'mid_stoploss_metric': Gauge('trade_bot_mid_stoploss', 'Mid stoploss value', ['currency'])  # Adicionado
     }
     return metrics
 
-def update_metrics_on_buy(metrics, current_price, stoploss, stopgain, potential_loss, potential_gain, symbol):
+def update_metrics_on_buy(metrics, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain, symbol):
     metrics['current_stoploss_metric'].labels(symbol).set(stoploss)
     metrics['current_stopgain_metric'].labels(symbol).set(stopgain)
     metrics['last_buy_price_metric'].labels(symbol).set(current_price)
@@ -61,6 +62,7 @@ def update_metrics_on_buy(metrics, current_price, stoploss, stopgain, potential_
     metrics['buy_price_spread_metric'].labels(symbol).set(potential_gain - potential_loss)
     metrics['potential_loss_metric'].labels(symbol).set(potential_loss)
     metrics['potential_gain_metric'].labels(symbol).set(potential_gain)
+    metrics['mid_stoploss_metric'].labels(symbol).set(mid_stoploss)  # Adicionado
 
 def update_metrics_on_sell(metrics, ticker, symbol):
     metrics['last_sell_price_metric'].labels(symbol).set(ticker)
@@ -74,8 +76,8 @@ def buy_condition(data, ema_span):
     previous_high = data['high'].iloc[-2]
     return previous_ema > pre_previous_ema and current_price >= previous_high, current_price, previous_high
 
-def sell_condition(ticker, stoploss, stopgain):
-    return ticker <= stoploss or ticker >= stopgain
+def sell_condition(ticker, stoploss, stopgain, mid_stoploss, buy_price):
+    return ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > buy_price)
 
 def process_buy(client, symbol, quantity, data, interval, setup, trade_history, stopgain_percentage, metrics):
     buy_prices = []
@@ -85,6 +87,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     current_price = data['close'].iloc[-1]
     stoploss = data['low'].iloc[-2]
     stopgain = current_price * (1 + stopgain_percentage / 100)
+    mid_stoploss = stoploss  # Inicialmente o mesmo que stoploss
     potential_loss = (stoploss - current_price) / current_price * 100
     potential_gain = (stopgain - current_price) / current_price * 100
     
@@ -101,6 +104,7 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
         'min_referencia': [data['low'].iloc[-2]],
         'stoploss': [stoploss],
         'stopgain': [stopgain],
+        'mid_stoploss': [mid_stoploss],  # Adicionado
         'potential_loss': [potential_loss],
         'potential_gain': [potential_gain],
         'timeframe': [interval],
@@ -112,9 +116,9 @@ def process_buy(client, symbol, quantity, data, interval, setup, trade_history, 
     trade_history.to_csv('data/trade_history.csv', index=False)
     buy_prices.append(current_price)
     
-    update_metrics_on_buy(metrics, current_price, stoploss, stopgain, potential_loss, potential_gain, symbol)
+    update_metrics_on_buy(metrics, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain, symbol)
     
-    return trade_history, buy_prices, stoploss, stopgain, potential_loss, potential_gain, buy_duration
+    return trade_history, buy_prices, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain, buy_duration
 
 def process_sell(client, symbol, balance_btc, lot_size, ticker, trade_history, metrics):
     sell_prices = []
