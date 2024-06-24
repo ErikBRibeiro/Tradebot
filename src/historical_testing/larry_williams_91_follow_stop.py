@@ -4,8 +4,6 @@ from datetime import datetime
 import requests
 import time
 
-# TODO: ADICIONAR SALDO E PERCENTUAL MÉDIO DE GANHO NOS REPORTS
-
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -43,14 +41,17 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df = df[['open', 'high', 'low', 'close', 'open_time', 'close_time']]
     return df
 
-start_date = (datetime.now() - pd.DateOffset(years=4)).strftime('%Y-%m-%d')
+start_date = (datetime.now() - pd.DateOffset(years=1, months=6)).strftime('%Y-%m-%d')
+# end_date = (datetime.now() - pd.DateOffset(months=6)).strftime('%Y-%m-%d')
 end_date = datetime.now().strftime('%Y-%m-%d')
 
-data = fetch_candles('BTCUSDT', '1h', start_date, end_date)
+data = fetch_candles('ETHUSDT', '5m', start_date, end_date)
 data['close'] = data['close'].astype(float)
 data['low'] = data['low'].astype(float)
 data['high'] = data['high'].astype(float)
 data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
+
+saldo = 1000
 
 # print(data)
 
@@ -87,10 +88,12 @@ for i in range(50, len(data)):
             stoploss = data['low'].iloc[i - 2]
             
             # stopgain = buy_price * 1.35 # para 1d
-            # stopgain = buy_price * 1.25 # para 4h
-            stopgain = buy_price * 1.02 # para 1h
+            # stopgain = buy_price * 1.1 # para 4h
+            # stopgain = buy_price * 1.05 # para 1h
+            # stopgain = buy_price * 1.05 # para 1h no ETH
             # stopgain = buy_price * 1.015 # para 15m
-            # stopgain = buy_price * 1.011 # para 5m (valor atual no bot em operação real)
+            stopgain = buy_price * 1.085 # para 5m (valor atual no bot em operação real para ETH)
+            # stopgain = buy_price * 1.05 # para 5m (valor atual no bot em operação real para BTC)
             
             comprado = True
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
@@ -98,25 +101,28 @@ for i in range(50, len(data)):
     elif comprado:
         if data['low'].iloc[i - 1] <= data['low'].iloc[i - 2]:
             # loss_percentage = (buy_price - data['low'].iloc[i - 2]) / buy_price * 100
-            if data['close'].iloc[i - 1] < buy_price:
-                loss_percentage = calculate_loss_percentage(buy_price, stoploss)
+            if data['low'].iloc[i - 2] < buy_price:
+                loss_percentage = calculate_loss_percentage(buy_price, data['low'].iloc[i - 2])
                 results[year][month]['failed_trades'] += 1
                 results[year][month]['perda_percentual_total'] += loss_percentage
+                saldo -= saldo * loss_percentage / 100
                 comprado = False
                 # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
                 continue
-            elif data['close'].iloc[i - 1] >= buy_price:
-                profit = calculate_gain_percentage(buy_price, stopgain)
+            elif data['low'].iloc[i - 2] >= buy_price:
+                profit = calculate_gain_percentage(buy_price, data['low'].iloc[i - 2])
                 results[year][month]['lucro'] += profit
                 results[year][month]['successful_trades'] += 1
+                saldo += saldo * profit / 100
                 comprado = False
                 # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
                 continue
-        elif data['close'].iloc[i - 1] >= stopgain:
+        elif data['high'].iloc[i - 1] >= stopgain:
             # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
             profit = calculate_gain_percentage(buy_price, stopgain)
             results[year][month]['lucro'] += profit
             results[year][month]['successful_trades'] += 1
+            saldo += saldo * profit / 100
             comprado = False
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
             continue
@@ -137,6 +143,7 @@ for year in results:
     print(f"  Operações realizadas: {sum([results[year][month]['open_trades'] for month in results[year]])}")
     print(f"  Trades de sucesso: {sum([results[year][month]['successful_trades'] for month in results[year]])}")
     print(f"  Lucro obtido: {sum([results[year][month]['lucro'] for month in results[year]])}")
+    print(f"  Ganho médio por trade: {sum([results[year][month]['lucro'] for month in results[year]]) / sum([results[year][month]['successful_trades'] for month in results[year]])}")
     print(f"  Trades em prejuízo: {sum([results[year][month]['failed_trades'] for month in results[year]])}")
     print(f"  Perda total: {sum([results[year][month]['perda_percentual_total'] for month in results[year]])}")
     
@@ -156,6 +163,7 @@ for year in results:
         print(f"    Operações realizadas: {results[year][month]['open_trades']}")
         print(f"    Trades de sucesso: {results[year][month]['successful_trades']}")
         print(f"    Lucro obtido: {results[year][month]['lucro']}")
+        print(f"    Ganho médio por trade: {results[year][month]['lucro'] / results[year][month]['successful_trades']}")
         print(f"    Trades em prejuízo: {results[year][month]['failed_trades']}")
         print(f"    Perda total: {results[year][month]['perda_percentual_total']}")
         
@@ -174,7 +182,9 @@ print(f"Operações realizadas: {sum([results[year][month]['open_trades'] for ye
 print(f"Taxa de acerto: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]]) / sum([results[year][month]['open_trades'] for year in results for month in results[year]]) * 100}%")
 print(f"Trades de sucesso: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]])}")
 print(f"Lucro obtido: {sum([results[year][month]['lucro'] for year in results for month in results[year]])}")
+print(f"Ganho médio por trade: {sum([results[year][month]['lucro'] for year in results for month in results[year]]) / sum([results[year][month]['successful_trades'] for year in results for month in results[year]])}")
 print(f"Trades em prejuízo: {sum([results[year][month]['failed_trades'] for year in results for month in results[year]])}")
 print(f"Perda total: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]])}")
 print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]])}")
 print(f"Resultado final: {sum([results[year][month]['lucro'] - results[year][month]['perda_percentual_total'] for year in results for month in results[year]])}")
+print(f"Saldo final: {saldo}")
