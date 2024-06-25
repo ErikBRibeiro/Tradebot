@@ -45,13 +45,18 @@ start_date = (datetime.now() - pd.DateOffset(years=1, months=6)).strftime('%Y-%m
 # end_date = (datetime.now() - pd.DateOffset(months=6)).strftime('%Y-%m-%d')
 end_date = datetime.now().strftime('%Y-%m-%d')
 
-data = fetch_candles('ETHUSDT', '5m', start_date, end_date)
+data = fetch_candles('BTCUSDT', '5m', start_date, end_date)
 data['close'] = data['close'].astype(float)
 data['low'] = data['low'].astype(float)
 data['high'] = data['high'].astype(float)
 data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
 
 saldo = 1000
+
+taxa_por_operacao = 0.0153 * 2 # taxa de entrada e de saída -> futuros usdc
+# taxa_por_operacao = 0.04125 * 2 # taxa de entrada e de saída -> spot usdc
+# taxa_por_operacao = 0.045 * 2 # taxa de entrada e de saída -> spot e futuros usdt
+# taxa_por_operacao = 0 # sem taxa de entrada e de saída
 
 # print(data)
 
@@ -92,8 +97,8 @@ for i in range(50, len(data)):
             # stopgain = buy_price * 1.05 # para 1h
             # stopgain = buy_price * 1.05 # para 1h no ETH
             # stopgain = buy_price * 1.015 # para 15m
-            stopgain = buy_price * 1.085 # para 5m (valor atual no bot em operação real para ETH)
-            # stopgain = buy_price * 1.05 # para 5m (valor atual no bot em operação real para BTC)
+            # stopgain = buy_price * 1.085 # para 5m (valor atual no bot em operação real para ETH)
+            stopgain = buy_price * 1.05 # para 5m (valor atual no bot em operação real para BTC)
             
             comprado = True
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
@@ -104,25 +109,25 @@ for i in range(50, len(data)):
             if data['low'].iloc[i - 2] < buy_price:
                 loss_percentage = calculate_loss_percentage(buy_price, data['low'].iloc[i - 2])
                 results[year][month]['failed_trades'] += 1
-                results[year][month]['perda_percentual_total'] += loss_percentage
-                saldo -= saldo * loss_percentage / 100
+                results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
+                saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
                 comprado = False
                 # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
                 continue
             elif data['low'].iloc[i - 2] >= buy_price:
                 profit = calculate_gain_percentage(buy_price, data['low'].iloc[i - 2])
-                results[year][month]['lucro'] += profit
+                results[year][month]['lucro'] += profit - taxa_por_operacao
                 results[year][month]['successful_trades'] += 1
-                saldo += saldo * profit / 100
+                saldo += saldo * ((profit - taxa_por_operacao) / 100)
                 comprado = False
                 # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
                 continue
         elif data['high'].iloc[i - 1] >= stopgain:
             # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
             profit = calculate_gain_percentage(buy_price, stopgain)
-            results[year][month]['lucro'] += profit
+            results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
-            saldo += saldo * profit / 100
+            saldo += saldo * ((profit - taxa_por_operacao) / 100)
             comprado = False
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
             continue
