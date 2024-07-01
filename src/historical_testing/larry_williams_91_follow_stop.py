@@ -149,13 +149,13 @@ for year in results:
     print(f"Ano: {year}")
     print(f"  Operações realizadas: {sum([results[year][month]['open_trades'] for month in results[year]])}")
     print(f"  Trades de sucesso: {sum([results[year][month]['successful_trades'] for month in results[year]])}")
-    print(f"  Lucro obtido: {sum([results[year][month]['lucro'] for month in results[year]])}")
+    print(f"  Soma dos ganhos: {sum([results[year][month]['lucro'] for month in results[year]]):.2f}%")
     try:
-        print(f"  Ganho médio por trade: {sum([results[year][month]['lucro'] for month in results[year]]) / sum([results[year][month]['successful_trades'] for month in results[year]])}")
+        print(f"  Ganho médio por trade: {sum([results[year][month]['lucro'] for month in results[year]]) / sum([results[year][month]['successful_trades'] for month in results[year]]):.2f}%")
     except ZeroDivisionError:
         print(f"  Ganho médio por trade: 0")
     print(f"  Trades em prejuízo: {sum([results[year][month]['failed_trades'] for month in results[year]])}")
-    print(f"  Perda total: {sum([results[year][month]['perda_percentual_total'] for month in results[year]])}")
+    print(f"  Soma das perdas: {sum([results[year][month]['perda_percentual_total'] for month in results[year]]):.2f}%")
     
     total_loss = sum([results[year][month]['perda_percentual_total'] for month in results[year]])
     total_failed_trades = sum([results[year][month]['failed_trades'] for month in results[year]])
@@ -165,49 +165,70 @@ for year in results:
     else:
         avg_loss_per_trade = 0
 
-    print(f"  Perda média por trade: {avg_loss_per_trade}")
-    print(f"  Resultado final: {sum([results[year][month]['lucro'] - results[year][month]['perda_percentual_total'] for month in results[year]])}")
-    print(f"  Saldo inicial: {results[year][list(results[year].keys())[0]]['saldo_inicial']}")
-    print(f"  Saldo final: {results[year][list(results[year].keys())[-1]]['saldo_final']}")
+    print(f"  Perda média por trade: {avg_loss_per_trade:.2f}%")
+    
+    if results[year][list(results[year].keys())[0]]['saldo_inicial'] < results[year][list(results[year].keys())[-1]]['saldo_final']:
+        print(f"  Resultado final: {((results[year][list(results[year].keys())[-1]]['saldo_final'] / results[year][list(results[year].keys())[0]]['saldo_inicial']) - 1) * 100:.2f}%")
+    else:
+        print(f"  Resultado final: {((1 - (results[year][list(results[year].keys())[-1]]['saldo_final'] / results[year][list(results[year].keys())[0]]['saldo_inicial'])) * -1) * 100:.2f}%")
+    
+    print(f"  Saldo inicial: {results[year][list(results[year].keys())[0]]['saldo_inicial']:.2f}")
+    print(f"  Saldo final: {results[year][list(results[year].keys())[-1]]['saldo_final']:.2f}")
     print("Detalhes:")
     for month in results[year]:
         print(f"  Mês: {month}")
         print(f"    Operações realizadas: {results[year][month]['open_trades']}")
         print(f"    Trades de sucesso: {results[year][month]['successful_trades']}")
-        print(f"    Lucro obtido: {results[year][month]['lucro']}")
+        print(f"    Soma dos ganhos: {results[year][month]['lucro']:.2f}%")
         try:
-            print(f"    Ganho médio por trade: {results[year][month]['lucro'] / results[year][month]['successful_trades']}")
+            print(f"    Ganho médio por trade: {results[year][month]['lucro'] / results[year][month]['successful_trades']:.2f}%")
         except ZeroDivisionError:
             print(f"    Ganho médio por trade: 0")
         print(f"    Trades em prejuízo: {results[year][month]['failed_trades']}")
-        print(f"    Perda total: {results[year][month]['perda_percentual_total']}")
+        print(f"    Soma das perdas: {results[year][month]['perda_percentual_total']:.2f}%")
         
         failed_trades = results[year][month]['failed_trades']
+
         if failed_trades != 0:
             avg_loss_per_trade = results[year][month]['perda_percentual_total'] / failed_trades
         else:
             avg_loss_per_trade = 0
 
-        print(f"    Perda média por trade: {avg_loss_per_trade}")
-        print(f"    Resultado final: {results[year][month]['lucro'] - results[year][month]['perda_percentual_total']}")
-        print(f"    Saldo inicial: {results[year][month]['saldo_inicial']}")
-        print(f"    Saldo final: {results[year][month]['saldo_final']}")
+        print(f"    Perda média por trade: {avg_loss_per_trade:.2f}%")
+
+        if results[year][month]['saldo_inicial'] < results[year][month]['saldo_final']:
+            print(f"    Resultado final: {(results[year][month]['saldo_final'] / results[year][month]['saldo_inicial'] - 1) * 100:.2f}%")
+        else:
+            print(f"    Resultado final: {((1 - (results[year][month]['saldo_final'] / results[year][month]['saldo_inicial'])) * -1) * 100:.2f}%")
+
+        print(f"    Saldo inicial: {results[year][month]['saldo_inicial']:.2f}")
+        print(f"    Saldo final: {results[year][month]['saldo_final']:.2f}")
         print("-------------------")
 
 print("Total:")
 print(f"Operações realizadas: {sum([results[year][month]['open_trades'] for year in results for month in results[year]])}")
-print(f"Taxa de acerto: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]]) / sum([results[year][month]['open_trades'] for year in results for month in results[year]]) * 100}%")
+print(f"Taxa de acerto: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]]) / sum([results[year][month]['open_trades'] for year in results for month in results[year]]) * 100:.2f}%")
 print(f"Trades de sucesso: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]])}")
-print(f"Lucro obtido: {sum([results[year][month]['lucro'] for year in results for month in results[year]])}")
+print(f"Soma dos ganhos: {sum([results[year][month]['lucro'] for year in results for month in results[year]]):.2f}%")
+
 try:
-    print(f"Ganho médio por trade: {sum([results[year][month]['lucro'] for year in results for month in results[year]]) / sum([results[year][month]['successful_trades'] for year in results for month in results[year]])}")
+    print(f"Ganho médio por trade: {sum([results[year][month]['lucro'] for year in results for month in results[year]]) / sum([results[year][month]['successful_trades'] for year in results for month in results[year]]):.2f}%")
 except ZeroDivisionError:
     print(f"Ganho médio por trade: 0")
+
 print(f"Trades em prejuízo: {sum([results[year][month]['failed_trades'] for year in results for month in results[year]])}")
-print(f"Perda total: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]])}")
-print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]])}")
-print(f"Resultado final: {sum([results[year][month]['lucro'] - results[year][month]['perda_percentual_total'] for year in results for month in results[year]])}")
-print(f"Saldo inicial: {results[list(results.keys())[0]][list(results[list(results.keys())[0]].keys())[0]]['saldo_inicial']}")
-print(f"Saldo final: {results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']}")
+print(f"Soma das perdas: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]):.2f}%")
+print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]]):.2f}%")
+
+saldo_inicial = results[list(results.keys())[0]][list(results[list(results.keys())[0]].keys())[0]]['saldo_inicial']
+saldo_final = results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']
+
+if saldo_inicial < saldo_final:
+    print(f"Resultado final: {(saldo_final / saldo_inicial - 1) * 100:.2f}%")
+else:
+    print(f"Resultado final: {((1 - (saldo_final / saldo_inicial)) * -1) * 100:.2f}%")
+
+print(f"Saldo inicial: {results[list(results.keys())[0]][list(results[list(results.keys())[0]].keys())[0]]['saldo_inicial']:.2f}")
+print(f"Saldo final: {results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']:.2f}")
 print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
