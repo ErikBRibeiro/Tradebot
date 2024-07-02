@@ -114,7 +114,7 @@ for i in range(50, len(data)):
             continue
         
     if not comprado:
-        if LarryWilliamsHeterodoxo.compra_ema9_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
+        if LarryWilliamsHeterodoxo.compra_ema_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
             results[year][month]['open_trades'] += 1
             buy_price = data['high'].iloc[i - 2]
             stoploss = data['low'].iloc[i - 2]
