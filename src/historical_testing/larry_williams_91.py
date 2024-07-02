@@ -8,7 +8,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from utilities import calculate_gain_percentage, calculate_loss_percentage
+import utilities as utilities
+import setups.larry_williams_heterodoxo as larry_williams_heterodoxo
+import setups.stopgain as stopgain_activated
+import setups.stoploss as stoploss_activated
 
 def fetch_candles(symbol, interval, start_str, end_str=None):
     url = 'https://api.binance.com/api/v3/klines'
@@ -91,9 +94,8 @@ for i in range(50, len(data)):
             'saldo_final': saldo
         }
 
-    if data['EMA_9'].iloc[i - 2] > data['EMA_9'].iloc[i - 3] and not comprado: # Encontrou a vela referência -> para gatilho e stop do trade::
-    # if data['EMA_9'].iloc[i - 2] > data['EMA_9'].iloc[i - 3] and data['EMA_9'].iloc[i - 3] < data['EMA_9'].iloc[i - 4] and not comprado: # Encontrou a vela referência -> para gatilho e stop do trade
-        if (data['high'].iloc[i - 1] > data['high'].iloc[i - 2]): # Superou a máxima da vela referência -> ativou o gatilho
+    if not comprado:
+        if larry_williams_heterodoxo.compra_ema9_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
             results[year][month]['open_trades'] += 1
             buy_price = data['high'].iloc[i - 2]
             stoploss = data['low'].iloc[i - 2]
@@ -113,8 +115,8 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
             continue
     elif comprado:
-        if data['low'].iloc[i - 1] <= stoploss:
-            loss_percentage = calculate_loss_percentage(buy_price, stoploss)
+        if stoploss_activated.venda(data['low'].iloc[i - 1], stoploss):
+            loss_percentage = utilities.calculate_loss_percentage(buy_price, stoploss)
             results[year][month]['failed_trades'] += 1
             results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
             saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
@@ -123,9 +125,9 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
             continue
             
-        elif data['high'].iloc[i - 1] >= stopgain:
+        elif stopgain_activated.venda(data['high'].iloc[i - 1], stopgain):
             # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
-            profit = calculate_gain_percentage(buy_price, stopgain)
+            profit = utilities.calculate_gain_percentage(buy_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
             saldo += saldo * ((profit - taxa_por_operacao) / 100)
