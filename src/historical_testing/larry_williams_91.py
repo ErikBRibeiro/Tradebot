@@ -136,6 +136,8 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
             continue
 
+descricao_setup = "EMA 9 rompimento, stopgain em 18% e stoploss na min do candle anterior"
+
 for year in results:
     print(f"Ano: {year}")
     print(f"  Operações realizadas: {sum([results[year][month]['open_trades'] for month in results[year]])}")
@@ -230,3 +232,4 @@ print(f"Saldo inicial: {results[list(results.keys())[0]][list(results[list(resul
 print(f"Saldo final: {results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']:.2f}")
 print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
+print(f"Setup: {descricao_setup}")

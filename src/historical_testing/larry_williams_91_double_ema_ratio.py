@@ -42,18 +42,20 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df = df[['open', 'high', 'low', 'close', 'open_time', 'close_time']]
     return df
 
-start_date = '2023-01-01'
+start_date = '2022-12-20'
 # end_date = '2024-06-27'
 end_date = datetime.now().strftime('%Y-%m-%d')
 
 ativo = 'BTCUSDT'
-timeframe = '15m'
+timeframe = '1h'
 
 data = fetch_candles(ativo, timeframe, start_date, end_date)
 data['close'] = data['close'].astype(float)
 data['low'] = data['low'].astype(float)
 data['high'] = data['high'].astype(float)
 data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
+data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
+data['EMA_80'] = data['close'].ewm(span=90, adjust=False).mean()
 
 saldo = 1000
 
@@ -74,7 +76,7 @@ comprado = False
 
 results = {}
 
-for i in range(50, len(data)):
+for i in range(999, len(data)):
     year = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).year)
     month = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).month)
 
@@ -92,26 +94,18 @@ for i in range(50, len(data)):
         }
 
     if comprado:
-        if StopLoss.venda(data['low'].iloc[i - 1], data['low'].iloc[i - 2]):
-            if StopLoss.venda(data['low'].iloc[i - 2], buy_price):
-                loss_percentage = Utilities.calculate_loss_percentage(buy_price, data['low'].iloc[i - 2])
-                results[year][month]['failed_trades'] += 1
-                results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
-                saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
-                results[year][month]['saldo_final'] = saldo
-                comprado = False
-                # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
-                continue
-            elif StopGain.venda(data['low'].iloc[i - 2], buy_price):
-                profit = Utilities.calculate_gain_percentage(buy_price, data['low'].iloc[i - 2])
-                results[year][month]['lucro'] += profit - taxa_por_operacao
-                results[year][month]['successful_trades'] += 1
-                saldo += saldo * ((profit - taxa_por_operacao) / 100)
-                results[year][month]['saldo_final'] = saldo
-                comprado = False
-                # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
-                continue
+        if StopLoss.venda(data['low'].iloc[i - 1], stoploss):
+            loss_percentage = Utilities.calculate_loss_percentage(buy_price, stoploss)
+            results[year][month]['failed_trades'] += 1
+            results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
+            saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
+            results[year][month]['saldo_final'] = saldo
+            comprado = False
+            # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
+            continue
+            
         elif StopGain.venda(data['high'].iloc[i - 1], stopgain):
+            # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
             profit = Utilities.calculate_gain_percentage(buy_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
@@ -121,30 +115,43 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
             continue
 
-    if not comprado:
-        if LarryWilliamsHeterodoxo.compra_ema_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
-            results[year][month]['open_trades'] += 1
-            buy_price = data['high'].iloc[i - 2]
-            stoploss = data['low'].iloc[i - 2]
-            if taxa_por_operacao != 0:
-                saldo -= saldo * taxa_por_operacao / 100
-            results[year][month]['saldo_final'] = saldo
-            
-            # stopgain = buy_price * 1.35 # para 1d
-            # stopgain = buy_price * 1.1 # para 4h
-            # stopgain = buy_price * 1.10 # para 1h
-            # stopgain = buy_price * 1.05 # para 1h no ETH
-            # stopgain = buy_price * 1.18 # para 15m
-            stopgain = StopGain.set_venda_percentage(buy_price, 18)
-            # stopgain = buy_price * 1.085 # para 15m no ETH
-            # stopgain = buy_price * 1.085 # para 5m (valor atual no bot em operação real para ETH)
-            # stopgain = buy_price * 1.05 # para 5m (valor atual no bot em operação real para BTC)
-            
-            comprado = True
-            # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
-            continue
+        # elif LarryWilliamsHeterodoxo.venda_ema_fechamento(data['EMA_9'].iloc[i - 2], data['close'].iloc[i - 2]):
+        #     # verifica se foi loss ou gain
+        #     if StopLoss.venda(data['close'].iloc[i - 2], buy_price):
+        #         loss_percentage = Utilities.calculate_loss_percentage(buy_price, data['low'].iloc[i - 2])
+        #         results[year][month]['failed_trades'] += 1
+        #         results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
+        #         saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
+        #         results[year][month]['saldo_final'] = saldo
+        #         comprado = False
+        #         # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
+        #         continue
+        #     elif StopGain.venda(data['close'].iloc[i - 2], buy_price):
+        #         profit = Utilities.calculate_gain_percentage(buy_price, data['low'].iloc[i - 2])
+        #         results[year][month]['lucro'] += profit - taxa_por_operacao
+        #         results[year][month]['successful_trades'] += 1
+        #         saldo += saldo * ((profit - taxa_por_operacao) / 100)
+        #         results[year][month]['saldo_final'] = saldo
+        #         comprado = False
+        #         # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
+        #         continue
 
-descricao_setup = "EMA 9/21 rompimento com follow stop, stopgain em 18% e stoploss na min do candle anterior"
+    if not comprado:
+        if data['EMA_21'].iloc[i - 2] < data['close'].iloc[i - 2]:
+            if LarryWilliamsHeterodoxo.compra_ema_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
+                results[year][month]['open_trades'] += 1
+                buy_price = data['high'].iloc[i - 2]
+                stoploss = StopLoss.set_venda_min_candles(data.iloc[i - 15:i - 1], 14) # stoploss = StopLoss.set_venda_min_candles(data, 14) -> para o código live
+                if taxa_por_operacao != 0:
+                    saldo -= saldo * taxa_por_operacao / 100
+                results[year][month]['saldo_final'] = saldo
+                ratio = 3.5
+                stopgain = StopGain.set_venda_ratio(buy_price, stoploss, ratio)
+                comprado = True
+                # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
+                continue
+
+descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
 
 for year in results:
     print(f"Ano: {year}")
@@ -240,5 +247,4 @@ print(f"Saldo inicial: {results[list(results.keys())[0]][list(results[list(resul
 print(f"Saldo final: {results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']:.2f}")
 print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
-
 print(f"Setup: {descricao_setup}")

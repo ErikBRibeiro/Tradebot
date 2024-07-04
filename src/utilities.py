@@ -9,3 +9,7 @@ def calculate_loss_percentage(buy_price, stop_loss):
 # verifica se o candle em questão está em um dia útil
 def is_weekday(data):
     return datetime.fromtimestamp(data['open_time'] / 1000).weekday() < 5
+
+# verifica se o candle em questão está em um dia útil menos sexta
+def is_weekday_but_friday(data):
+    return datetime.fromtimestamp(data['open_time'] / 1000).weekday() < 4
