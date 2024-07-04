@@ -11,9 +11,9 @@ def venda(current_price, stoploss):
     return False
 
 # define o preço de fechamento em stoploss para uma operação de venda
-def set_compra_min_candles(data):
-    return max(data['high'])
+def set_compra_max_candles(data, candles=2):
+    return max(data['high'].tail(candles).tolist())
 
 # define o preço de fechamento em stoploss para uma operação de compra
-def set_venda_min_candles(data):
-    return min(data['low'])
+def set_venda_min_candles(data, candles=2):
+    return min(data['low'].tail(candles).tolist())
