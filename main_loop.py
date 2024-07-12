@@ -43,11 +43,21 @@ def main_loop():
                 logger.info("Bot v2 iniciado - Loop de compra.")
                 is_not_comprado_logged = True
 
-            is_buy, trade_history = strategy.evaluate(is_buy, trade_history)
+            if is_buy:
+                strategy.sell_logic(trade_history['valor_compra'].iloc[-1], trade_history, trade_history['min_referencia'].iloc[-1], trade_history['max_referencia'].iloc[-1])
+            else:
+                is_buy, trade_history = strategy.buy_logic(
+                    trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-2],
+                    trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-3],
+                    trade_history['valor_compra'].iloc[-1],
+                    trade_history['max_referencia'].iloc[-1],
+                    trade_history['min_referencia'].iloc[-1],
+                    trade_history
+                )
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")
             time.sleep(25)
-
+            
 if __name__ == "__main__":
     main_loop()
