@@ -50,7 +50,7 @@ class TradingStrategy:
             stopgain = trade_history['stopgain'].iloc[-1]
             mid_stoploss = previous_low
 
-            if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
+            if ticker <= stoploss or ticker >= stopgain or ticker <= mid_stoploss:
                 start_time = time.time()
                 balance_btc = self.data_interface.get_current_balance('BTC')
                 lot_size = self.data_interface.get_lot_size(self.symbol)
