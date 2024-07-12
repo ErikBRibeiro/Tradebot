@@ -60,23 +60,5 @@ class Metrics:
         self.buy_prices = []
         self.sell_prices = []
 
-
-    def update_metrics_on_buy(self, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain):
-        self.metrics.current_stoploss_metric.labels(self.symbol).set(stoploss)
-        self.metrics.current_stopgain_metric.labels(self.symbol).set(stopgain)
-        self.metrics.last_buy_price_metric.labels(self.symbol).set(current_price)
-        self.metrics.buy_attempts_metric.labels(self.symbol).inc()
-        self.metrics.successful_buys_metric.labels(self.symbol).inc()
-        self.metrics.buy_price_spread_metric.labels(self.symbol).set(max(self.metrics.buy_prices) - min(self.metrics.buy_prices) if self.metrics.buy_prices else 0)
-        self.metrics.potential_loss_metric.labels(self.symbol).set(potential_loss)
-        self.metrics.potential_gain_metric.labels(self.symbol).set(potential_gain)
-        self.metrics.mid_stoploss_metric.labels(self.symbol).set(mid_stoploss)
-        
-
-    def update_metrics_on_sell(self, ticker):
-        self.metrics.last_sell_price_metric.labels(self.symbol).set(ticker)
-        self.metrics.successful_sells_metric.labels(self.symbol).inc()
-        self.metrics.sell_price_spread_metric.labels(self.symbol).set(max(self.metrics.sell_prices) - min(self.metrics.sell_prices) if self.metrics.sell_prices else 0)
-
 def start_prometheus_server(port=8000):
     start_http_server(port)

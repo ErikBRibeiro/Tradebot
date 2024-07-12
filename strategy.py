@@ -1,7 +1,6 @@
 import pandas as pd
 import time
 
-from metrics import update_metrics_on_sell, update_metrics_on_buy
 from utils import calculate_percentage, logger
 from datetime import datetime
 
@@ -66,7 +65,7 @@ class TradingStrategy:
                         logger.info("Venda realizada.")
                         self.position_maintained = False
                         trade_history = self.update_trade_history(trade_history, ticker)
-                        update_metrics_on_sell(ticker)
+                        self.update_metrics_on_sell(ticker)
                         break
                     else:
                         logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
@@ -112,7 +111,7 @@ class TradingStrategy:
             trade_history = pd.concat([trade_history, new_row], ignore_index=True)
             trade_history.to_csv('data/trade_history.csv', index=False)
             self.metrics.buy_prices.append(current_price)
-            update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
+            self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
             self.position_maintained = False
             return True, trade_history
 
@@ -126,3 +125,21 @@ class TradingStrategy:
         df.to_csv('data/trade_history.csv', index=False)
         self.metrics.transaction_outcome_metric.labels(self.symbol).observe(outcome)
         return df
+
+
+    def update_metrics_on_sell(self, ticker):
+        self.metrics.last_sell_price_metric.labels(self.symbol).set(ticker)
+        self.metrics.successful_sells_metric.labels(self.symbol).inc()
+        self.metrics.sell_price_spread_metric.labels(self.symbol).set(max(self.metrics.sell_prices) - min(self.metrics.sell_prices) if self.metrics.sell_prices else 0)
+
+
+    def update_metrics_on_buy(self, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain):
+        self.metrics.current_stoploss_metric.labels(self.symbol).set(stoploss)
+        self.metrics.current_stopgain_metric.labels(self.symbol).set(stopgain)
+        self.metrics.last_buy_price_metric.labels(self.symbol).set(current_price)
+        self.metrics.buy_attempts_metric.labels(self.symbol).inc()
+        self.metrics.successful_buys_metric.labels(self.symbol).inc()
+        self.metrics.buy_price_spread_metric.labels(self.symbol).set(max(self.metrics.buy_prices) - min(self.metrics.buy_prices) if self.metrics.buy_prices else 0)
+        self.metrics.potential_loss_metric.labels(self.symbol).set(potential_loss)
+        self.metrics.potential_gain_metric.labels(self.symbol).set(potential_gain)
+        self.metrics.mid_stoploss_metric.labels(self.symbol).set(mid_stoploss)
