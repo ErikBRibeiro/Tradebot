@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
-from utils import calculate_percentage, logger
 import pandas as pd
+from utils import calculate_percentage, logger
 
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
@@ -65,7 +65,7 @@ class TradingStrategy:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
                         self.metrics.total_trade_duration += trade_duration
-                        logger.info(f"Venda realizada em {trade_duration:.2f} segundos.")
+                        logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
                         trade_history = self.update_trade_history(trade_history, ticker)
                         self.update_metrics_on_sell(ticker)
                         self.position_maintained = False
@@ -95,7 +95,7 @@ class TradingStrategy:
             mid_stoploss = previous_low
             potential_loss = calculate_percentage(current_price, stoploss)
             potential_gain = calculate_percentage(current_price, stopgain)
-            logger.info(f"Compramos - Potencial de perda: {potential_loss:.2f}%, Potencial de ganho: {potential_gain:.2f}%")
+            logger.info(f"Compramos - Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
             new_row = pd.DataFrame({
                 'horario': [datetime.now()],
                 'moeda': [self.symbol],
@@ -121,3 +121,27 @@ class TradingStrategy:
             return True, trade_history
 
         return False, trade_history
+
+    def update_trade_history(self, df, sell_price):
+        df.at[df.index[-1], 'valor_venda'] = sell_price
+        outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
+        df.at[df.index[-1], 'outcome'] = outcome
+        df.to_csv('data/trade_history.csv', index=False)
+        self.metrics.transaction_outcome_metric.labels(self.symbol).observe(outcome)
+        return df
+
+    def update_metrics_on_sell(self, ticker):
+        self.metrics.last_sell_price_metric.labels(self.symbol).set(ticker)
+        self.metrics.successful_sells_metric.labels(self.symbol).inc()
+        self.metrics.sell_price_spread_metric.labels(self.symbol).set(max(self.metrics.sell_prices) - min(self.metrics.sell_prices) if self.metrics.sell_prices else 0)
+
+    def update_metrics_on_buy(self, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain):
+        self.metrics.current_stoploss_metric.labels(self.symbol).set(stoploss)
+        self.metrics.current_stopgain_metric.labels(self.symbol).set(stopgain)
+        self.metrics.last_buy_price_metric.labels(self.symbol).set(current_price)
+        self.metrics.buy_attempts_metric.labels(self.symbol).inc()
+        self.metrics.successful_buys_metric.labels(self.symbol).inc()
+        self.metrics.buy_price_spread_metric.labels(self.symbol).set(max(self.metrics.buy_prices) - min(self.metrics.buy_prices) if self.metrics.buy_prices else 0)
+        self.metrics.potential_loss_metric.labels(self.symbol).set(potential_loss)
+        self.metrics.potential_gain_metric.labels(self.symbol).set(potential_gain)
+        self.metrics.mid_stoploss_metric.labels(self.symbol).set(mid_stoploss)

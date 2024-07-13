@@ -45,6 +45,7 @@ def update_trade_history(df, sell_price):
     logger.info(f"Atualizado trade_history: {df.shape[0]} linhas")
 
 
+
 def log_trade(trade):
     with open('trades.log', 'a') as f:
         f.write(f"{trade}\n")
