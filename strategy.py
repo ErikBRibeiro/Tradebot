@@ -56,7 +56,7 @@ class TradingStrategy:
         if current_time - self.last_log_time >= 30:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
 
-        if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
+        if ticker <= stoploss or ticker >= stopgain or ticker <= mid_stoploss:
             if current_time - self.last_log_time >= 30:
                 logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
