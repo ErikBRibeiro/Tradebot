@@ -41,41 +41,53 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        while True:
-            ticker = self.data_interface.get_current_price(self.symbol)
-            if ticker is None:
-                return
+        logger.info("Obtendo preço atual...")
+        ticker = self.data_interface.get_current_price(self.symbol)
+        if ticker is None:
+            logger.warning("Preço atual não obtido. Tentando novamente...")
+            return True, trade_history
 
-            stoploss = trade_history['stoploss'].iloc[-1]
-            stopgain = trade_history['stopgain'].iloc[-1]
-            mid_stoploss = previous_low
+        logger.info(f"Preço atual obtido: {ticker}")
+        
+        stoploss = trade_history['stoploss'].iloc[-1]
+        stopgain = trade_history['stopgain'].iloc[-1]
+        mid_stoploss = previous_low
 
-            if ticker <= stoploss or ticker >= stopgain or ticker <= mid_stoploss:
-                start_time = time.time()
-                balance_btc = self.data_interface.get_current_balance('BTC')
-                lot_size = self.data_interface.get_lot_size(self.symbol)
-                if balance_btc > 0 and lot_size:
-                    quantity_to_sell = (balance_btc // lot_size) * lot_size
-                    if quantity_to_sell > 0:
-                        quantity_to_sell = round(quantity_to_sell, 8)
-                        self.data_interface.create_order(self.symbol, 'sell', quantity_to_sell)
+        logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
+
+        if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
+            logger.info("Condições de venda atendidas, tentando executar venda...")
+            start_time = time.time()
+            balance_btc = self.data_interface.get_current_balance('BTC')
+            lot_size = self.data_interface.get_lot_size(self.symbol)
+            if balance_btc > 0 and lot_size:
+                quantity_to_sell = (balance_btc // lot_size) * lot_size
+                if quantity_to_sell > 0:
+                    quantity_to_sell = round(quantity_to_sell, 8)
+                    order = self.data_interface.create_order(self.symbol, 'sell', quantity_to_sell)
+                    if order is not None:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
                         self.metrics.total_trade_duration += trade_duration
-                        logger.info("Venda realizada.")
-                        self.position_maintained = False
+                        logger.info(f"Venda realizada em {trade_duration:.2f} segundos.")
                         trade_history = self.update_trade_history(trade_history, ticker)
                         self.update_metrics_on_sell(ticker)
-                        break
-                    else:
-                        logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
                         self.position_maintained = False
-                        break
+                        return False, trade_history  # Atualiza para indicar que não está mais comprado
+                    else:
+                        logger.error("Erro ao tentar criar a ordem de venda.")
                 else:
-                    logger.info("Saldo de BTC insuficiente para venda.")
+                    logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
                     self.position_maintained = False
-                    break
-            time.sleep(1)
+                    return False, trade_history
+            else:
+                logger.info("Saldo de BTC insuficiente para venda.")
+                self.position_maintained = False
+                return False, trade_history
+
+        logger.info("Condições de venda não atendidas, mantendo posição.")
+        return True, trade_history  # Continua indicando que está comprado
+
 
 
     def buy_logic(self, previous_ema, pre_previous_ema, current_price, previous_high, previous_low, trade_history):
@@ -116,15 +128,6 @@ class TradingStrategy:
             return True, trade_history
 
         return False, trade_history
-
-
-    def update_trade_history(self, df, sell_price):
-        df.at[df.index[-1], 'valor_venda'] = sell_price
-        outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
-        df.at[df.index[-1], 'outcome'] = outcome
-        df.to_csv('data/trade_history.csv', index=False)
-        self.metrics.transaction_outcome_metric.labels(self.symbol).observe(outcome)
-        return df
 
 
     def update_metrics_on_sell(self, ticker):

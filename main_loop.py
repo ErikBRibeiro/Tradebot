@@ -28,6 +28,8 @@ def main_loop():
 
     is_comprado_logged = False
     is_not_comprado_logged = False
+    is_buy = False
+    trade_history = read_trade_history()
 
     while True:
         try:
@@ -44,8 +46,15 @@ def main_loop():
                 is_not_comprado_logged = True
 
             if is_buy:
-                strategy.sell_logic(trade_history['valor_compra'].iloc[-1], trade_history, trade_history['min_referencia'].iloc[-1], trade_history['max_referencia'].iloc[-1])
+                logger.info("Executando lógica de venda...")
+                is_buy, trade_history = strategy.sell_logic(
+                    trade_history['valor_compra'].iloc[-1],
+                    trade_history,
+                    trade_history['min_referencia'].iloc[-1],
+                    trade_history['max_referencia'].iloc[-1]
+                )
             else:
+                logger.info("Executando lógica de compra...")
                 is_buy, trade_history = strategy.buy_logic(
                     trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-2],
                     trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-3],
@@ -58,6 +67,7 @@ def main_loop():
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")
             time.sleep(25)
-            
+
+
 if __name__ == "__main__":
     main_loop()

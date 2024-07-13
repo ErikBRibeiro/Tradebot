@@ -7,14 +7,18 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
+
 def calculate_percentage(current_price, target_price):
     return (target_price - current_price) / current_price * 100
+
 
 def calculate_standard_deviation(prices):
     return pd.Series(prices).std()
 
+
 def calculate_profit_factor(total_profit, total_loss):
     return total_profit / abs(total_loss) if total_loss != 0 else float('inf')
+
 
 def safe_float_conversion(value):
     try:
@@ -22,19 +26,24 @@ def safe_float_conversion(value):
     except ValueError:
         return None
 
+
 def read_trade_history():
     if os.path.exists('data/trade_history.csv'):
         df = pd.read_csv('data/trade_history.csv')
         if not df.empty:
+            logger.info(f"Lido trade_history: {df.shape[0]} linhas")
             return df
-    return pd.DataFrame()
+    logger.info("Arquivo trade_history.csv não encontrado ou vazio. Criando novo DataFrame.")
+    return pd.DataFrame(columns=['horario', 'moeda', 'valor_compra', 'valor_venda', 'quantidade_moeda', 'max_referencia', 'min_referencia', 'stoploss', 'stopgain', 'mid_stoploss', 'potential_loss', 'potential_gain', 'timeframe', 'setup', 'outcome'])
 
-def update_trade_history(df, sell_price, metrics):
+
+def update_trade_history(df, sell_price):
     df.at[df.index[-1], 'valor_venda'] = sell_price
     outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
     df.at[df.index[-1], 'outcome'] = outcome
     df.to_csv('data/trade_history.csv', index=False)
-    metrics.transaction_outcome_metric.labels(metrics.symbol).observe(outcome)
+    logger.info(f"Atualizado trade_history: {df.shape[0]} linhas")
+
 
 def log_trade(trade):
     with open('trades.log', 'a') as f:
