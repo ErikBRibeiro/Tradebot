@@ -59,7 +59,8 @@ def main_loop():
                     trade_history['valor_compra'].iloc[-1],
                     trade_history,
                     trade_history['min_referencia'].iloc[-1],
-                    trade_history['max_referencia'].iloc[-1]
+                    trade_history['max_referencia'].iloc[-1],
+                    current_time
                 )
             else:
                 if current_time - last_log_time >= 30:
@@ -71,7 +72,8 @@ def main_loop():
                     trade_history['valor_compra'].iloc[-1],
                     trade_history['max_referencia'].iloc[-1],
                     trade_history['min_referencia'].iloc[-1],
-                    trade_history
+                    trade_history,
+                    current_time
                 )
 
             # Atualiza o histórico de negociações apenas após uma transação
