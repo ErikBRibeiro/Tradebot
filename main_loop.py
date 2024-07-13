@@ -40,14 +40,14 @@ def main_loop():
 
             if is_buy and not is_comprado_logged:
                 if current_time - last_log_time >= 30:
-                    logger.info("Bot iniciado - Loop de venda.")
+                    logger.info("Bot v2 iniciado - Loop de venda.")
                     last_log_time = current_time
                 is_comprado_logged = True
                 is_not_comprado_logged = False
 
             if not is_buy and not is_not_comprado_logged:
                 if current_time - last_log_time >= 30:
-                    logger.info("Bot iniciado - Loop de compra.")
+                    logger.info("Bot v2 iniciado - Loop de compra.")
                     last_log_time = current_time
                 is_not_comprado_logged = True
 
