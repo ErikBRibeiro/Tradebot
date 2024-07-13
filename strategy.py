@@ -44,15 +44,22 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
+        logger.info("Obtendo preço atual...")
         ticker = self.data_interface.get_current_price(self.symbol)
         if ticker is None:
+            logger.warning("Preço atual não obtido. Tentando novamente...")
             return True, trade_history
 
+        logger.info(f"Preço atual obtido: {ticker}")
+        
         stoploss = trade_history['stoploss'].iloc[-1]
         stopgain = trade_history['stopgain'].iloc[-1]
         mid_stoploss = previous_low
 
+        logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
+
         if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
+            logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
             balance_btc = self.data_interface.get_current_balance('BTC')
             lot_size = self.data_interface.get_lot_size(self.symbol)
@@ -81,6 +88,7 @@ class TradingStrategy:
                 self.position_maintained = False
                 return False, trade_history
 
+        logger.info("Condições de venda não atendidas, mantendo posição.")
         return True, trade_history  # Continua indicando que está comprado
 
     def buy_logic(self, previous_ema, pre_previous_ema, current_price, previous_high, previous_low, trade_history):
