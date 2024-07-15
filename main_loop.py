@@ -76,9 +76,9 @@ def main_loop():
                     current_time
                 )
 
-            # Atualiza o histórico de negociações apenas após uma transação
-            if trade_history is not None and not trade_history.empty:
-                trade_history.to_csv('data/trade_history.csv', index=False)
+            # Remover gravação redundante do trade_history
+            # if trade_history is not None and not trade_history.empty:
+            #     trade_history.to_csv('data/trade_history.csv', index=False)
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")

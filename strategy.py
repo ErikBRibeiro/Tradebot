@@ -1,7 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from utils import calculate_percentage, logger
-
+from utils import calculate_percentage, logger, update_trade_history
 import time
 
 class TradingStrategy:
@@ -14,16 +13,6 @@ class TradingStrategy:
         self.setup = setup
         self.position_maintained = False
         self.last_log_time = time.time()  # Inicializa o temporizador de logs
-
-    def update_trade_history(self, df, sell_price):
-        logger.info(f"Atualizando histórico de negociações com preço de venda: {sell_price}")
-        df.at[df.index[-1], 'valor_venda'] = sell_price
-        outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
-        df.at[df.index[-1], 'outcome'] = outcome
-        df.to_csv('data/trade_history.csv', index=False)
-        logger.info("Histórico de negociações atualizado e salvo no CSV.")
-        self.metrics.transaction_outcome_metric.labels(self.symbol).observe(outcome)
-        return df
 
     def update_metrics_on_sell(self, ticker):
         self.metrics.last_sell_price_metric.labels(self.symbol).set(ticker)
@@ -81,7 +70,7 @@ class TradingStrategy:
                         self.metrics.total_trade_duration += trade_duration
                         if current_time - self.last_log_time >= 30:
                             logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
-                        trade_history = self.update_trade_history(trade_history, ticker)
+                        trade_history = update_trade_history(trade_history, ticker)  # Usa a função do utils.py
                         self.update_metrics_on_sell(ticker)
                         self.position_maintained = False
                         self.last_log_time = current_time
@@ -136,7 +125,7 @@ class TradingStrategy:
             })
             trade_history = pd.concat([trade_history, new_row], ignore_index=True)
             logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
-            trade_history.to_csv('data/trade_history.csv', index=False)
+            trade_history.to_csv('data/trade_history.csv', index=False)  # Salva no CSV apenas após uma compra
             self.metrics.buy_prices.append(current_price)
             self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
             self.position_maintained = False
