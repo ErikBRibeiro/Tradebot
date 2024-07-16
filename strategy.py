@@ -99,36 +99,46 @@ class TradingStrategy:
             self.position_maintained = True
 
         if previous_ema > pre_previous_ema and current_price >= previous_high:
-            self.data_interface.create_order(self.symbol, 'buy', self.quantity)
-            stoploss = previous_low
-            stopgain = previous_high * 1.05
-            mid_stoploss = previous_low
-            potential_loss = calculate_percentage(current_price, stoploss)
-            potential_gain = calculate_percentage(current_price, stopgain)
-            logger.info(f"Compramos - Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
-            new_row = pd.DataFrame({
-                'horario': [datetime.now()],
-                'moeda': [self.symbol],
-                'valor_compra': [current_price],
-                'valor_venda': [None],
-                'quantidade_moeda': [self.quantity],
-                'max_referencia': [previous_high],
-                'min_referencia': [previous_low],
-                'stoploss': [stoploss],
-                'stopgain': [stopgain],
-                'mid_stoploss': [mid_stoploss],
-                'potential_loss': [potential_loss],
-                'potential_gain': [potential_gain],
-                'timeframe': [self.interval],
-                'setup': [self.setup],
-                'outcome': [None]
-            })
-            trade_history = pd.concat([trade_history, new_row], ignore_index=True)
-            logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
-            trade_history.to_csv('data/trade_history.csv', index=False)  # Salva no CSV apenas após uma compra
-            self.metrics.buy_prices.append(current_price)
-            self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
-            self.position_maintained = False
-            return True, trade_history
+            logger.info("Condições de compra atendidas, tentando executar compra...")
+            start_time = time.time()
+            order = self.data_interface.create_order(self.symbol, 'buy', self.quantity)
+            if order is not None:
+                stoploss = previous_low
+                stopgain = previous_high * 1.05
+                mid_stoploss = previous_low
+                potential_loss = calculate_percentage(current_price, stoploss)
+                potential_gain = calculate_percentage(current_price, stopgain)
+                logger.info(f"Compramos - Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
+                new_row = pd.DataFrame({
+                    'horario': [datetime.now()],
+                    'moeda': [self.symbol],
+                    'valor_compra': [current_price],
+                    'valor_venda': [None],
+                    'quantidade_moeda': [self.quantity],
+                    'max_referencia': [previous_high],
+                    'min_referencia': [previous_low],
+                    'stoploss': [stoploss],
+                    'stopgain': [stopgain],
+                    'mid_stoploss': [mid_stoploss],
+                    'potential_loss': [potential_loss],
+                    'potential_gain': [potential_gain],
+                    'timeframe': [self.interval],
+                    'setup': [self.setup],
+                    'outcome': [None]
+                })
+                trade_history = pd.concat([trade_history, new_row], ignore_index=True)
+                logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
+                trade_history.to_csv('data/trade_history.csv', index=False)  # Salva no CSV apenas após uma compra
+                self.metrics.buy_prices.append(current_price)
+                self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
+                self.position_maintained = False
+                return True, trade_history
+            else:
+                logger.error("Erro ao tentar criar a ordem de compra.")
+                self.position_maintained = False
+                return False, trade_history
 
+        if current_time - self.last_log_time >= 30:
+            logger.info("Condições de compra não atendidas.")
+            self.last_log_time = current_time
         return False, trade_history
