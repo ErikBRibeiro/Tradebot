@@ -35,26 +35,26 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        if current_time - self.last_log_time >= 30:
+        if current_time - self.last_log_time >= 120:
             logger.info("Obtendo preço atual...")
         ticker = self.data_interface.get_current_price(self.symbol)
         if ticker is None:
-            if current_time - self.last_log_time >= 30:
+            if current_time - self.last_log_time >= 120:
                 logger.warning("Preço atual não obtido. Tentando novamente...")
             return True, trade_history
 
-        if current_time - self.last_log_time >= 30:
+        if current_time - self.last_log_time >= 120:
             logger.info(f"Preço atual obtido: {ticker}")
 
         stoploss = trade_history['stoploss'].iloc[-1]
         stopgain = trade_history['stopgain'].iloc[-1]
         mid_stoploss = previous_low
 
-        if current_time - self.last_log_time >= 30:
+        if current_time - self.last_log_time >= 120:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
 
         if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
-            if current_time - self.last_log_time >= 30:
+            if current_time - self.last_log_time >= 120:
                 logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
             balance_btc = self.data_interface.get_current_balance('BTC')
@@ -68,7 +68,7 @@ class TradingStrategy:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
                         self.metrics.total_trade_duration += trade_duration
-                        if current_time - self.last_log_time >= 30:
+                        if current_time - self.last_log_time >= 120:
                             logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
                         trade_history = update_trade_history(trade_history, ticker)  # Usa a função do utils.py
                         self.update_metrics_on_sell(ticker)
@@ -78,17 +78,17 @@ class TradingStrategy:
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
                 else:
-                    if current_time - self.last_log_time >= 30:
+                    if current_time - self.last_log_time >= 120:
                         logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
                     self.position_maintained = False
                     return False, trade_history
             else:
-                if current_time - self.last_log_time >= 30:
+                if current_time - self.last_log_time >= 120:
                     logger.info("Saldo de BTC insuficiente para venda.")
                 self.position_maintained = False
                 return False, trade_history
 
-        if current_time - self.last_log_time >= 30:
+        if current_time - self.last_log_time >= 120:
             logger.info("Condições de venda não atendidas, mantendo posição.")
             self.last_log_time = current_time
         return True, trade_history  # Continua indicando que está comprado
@@ -138,7 +138,7 @@ class TradingStrategy:
                 self.position_maintained = False
                 return False, trade_history
 
-        if current_time - self.last_log_time >= 30:
+        if current_time - self.last_log_time >= 120:
             logger.info("Condições de compra não atendidas.")
             self.last_log_time = current_time
         return False, trade_history
