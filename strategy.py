@@ -98,6 +98,9 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
+        if current_time - self.last_log_time >= 120:
+            logger.info(f"Valores de compra - previous_ema: {previous_ema}, pre_previous_ema: {pre_previous_ema}, current_price: {current_price}, previous_high: {previous_high}")
+
         if previous_ema > pre_previous_ema and current_price >= previous_high:
             logger.info("Condições de compra atendidas, tentando executar compra...")
             start_time = time.time()
