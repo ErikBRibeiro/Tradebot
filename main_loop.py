@@ -67,11 +67,6 @@ def main_loop():
                     logger.info("Executando lógica de compra...")
                     last_log_time = current_time
                 is_buy, trade_history = strategy.buy_logic(
-                    trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-2],
-                    trade_history['valor_compra'].ewm(span=9, adjust=False).mean().iloc[-3],
-                    trade_history['valor_compra'].iloc[-1],
-                    trade_history['max_referencia'].iloc[-1],
-                    trade_history['min_referencia'].iloc[-1],
                     trade_history,
                     current_time
                 )
