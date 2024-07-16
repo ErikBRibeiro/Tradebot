@@ -98,14 +98,14 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        if len(trade_history) < 3:
+        if len(trade_history) < 10:  # Certifique-se de que há dados suficientes para calcular a EMA
             logger.info("Histórico de negociações insuficiente para calcular a EMA.")
             return False, trade_history
 
         # Calcular a EMA
-        ema_9 = trade_history['valor_compra'].ewm(span=9, adjust=False).mean()
-        previous_ema = ema_9.iloc[-2]
-        pre_previous_ema = ema_9.iloc[-3]
+        trade_history['ema_9'] = trade_history['valor_compra'].ewm(span=9, adjust=False).mean()
+        previous_ema = trade_history['ema_9'].iloc[-2]
+        pre_previous_ema = trade_history['ema_9'].iloc[-3]
         current_price = self.data_interface.get_current_price(self.symbol)
         previous_high = trade_history['max_referencia'].iloc[-1]
         previous_low = trade_history['min_referencia'].iloc[-1]
