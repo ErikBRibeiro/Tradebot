@@ -12,6 +12,6 @@ if not API_KEY or not API_SECRET:
     raise ValueError("API Key ou API Secret não encontrada. Verifique o arquivo .env.")
 
 SYMBOL = "BTCUSDT"
-QUANTITY = 0.0011  # A quantidade de BTC transacionada fixa
+QUANTITY = 0.0011  # A quantidade de BTC transacionada fixa; fix futuro: ajustar conforme o saldo disponível
 INTERVAL = '5m'  # O intervalo de tempo das velas
 SETUP = "9.1"  # Identificador do setup de trading

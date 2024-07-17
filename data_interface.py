@@ -9,7 +9,7 @@ class LiveData:
     def __init__(self, api_key, api_secret):
         self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
 
-    def get_historical_data(self, symbol, interval, limit=50):
+    def get_historical_data(self, symbol, interval, limit=150):
         try:
             klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
             data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
@@ -18,6 +18,8 @@ class LiveData:
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
             data['volume'] = data['volume'].apply(safe_float_conversion)
+            data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
+            data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
                 logger.error("Dados corrompidos recebidos da API Binance.")

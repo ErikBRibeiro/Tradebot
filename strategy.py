@@ -1,7 +1,11 @@
 import pandas as pd
 
-from utils import calculate_percentage, logger
+from utils import calculate_percentage, logger, calculate_gain_percentage, calculate_loss_percentage
 from datetime import datetime
+
+from setups.stopgain import sell_stopgain, set_sell_stopgain_ratio
+from setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
+from setups.emas import buy_double_ema_breakout
 
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
@@ -18,20 +22,14 @@ class TradingStrategy:
         if data is None:
             return is_buy, trade_history
 
-        previous_ema = data['close'].ewm(span=9, adjust=False).mean().iloc[-2]
-        pre_previous_ema = data['close'].ewm(span=9, adjust=False).mean().iloc[-3]
-        current_price = data['close'].iloc[-1]
-        previous_high = data['high'].iloc[-2]
-        previous_low = data['low'].iloc[-2]
-
         if is_buy:
-            self.sell_logic(current_price, trade_history, previous_low, previous_high)
+            self.sell_logic(data, trade_history)
         else:
-            is_buy, trade_history = self.buy_logic(previous_ema, pre_previous_ema, current_price, previous_high, previous_low, trade_history)
+            is_buy, trade_history = self.buy_logic(data, trade_history)
 
         return is_buy, trade_history
 
-    def sell_logic(self, current_price, trade_history, previous_low, previous_high):
+    def sell_logic(self, data, trade_history):
         if not self.position_maintained:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
@@ -42,9 +40,8 @@ class TradingStrategy:
 
         stoploss = trade_history['stoploss'].iloc[-1]
         stopgain = trade_history['stopgain'].iloc[-1]
-        mid_stoploss = previous_low
 
-        if ticker <= stoploss or ticker >= stopgain or (ticker <= mid_stoploss and mid_stoploss > trade_history['valor_compra'].iloc[-1]):
+        if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
             balance_btc = self.data_interface.get_current_balance('BTC')
             lot_size = self.data_interface.get_lot_size(self.symbol)
             if balance_btc > 0 and lot_size:
@@ -52,35 +49,33 @@ class TradingStrategy:
                 if quantity_to_sell > 0:
                     quantity_to_sell = round(quantity_to_sell, 8)
                     self.data_interface.create_order(self.symbol, 'sell', quantity_to_sell)
-                    logger.info("Venda realizada.")
+                    logger.info(f"Venda realizada na vela das {data['open_time']} em {data['close'].iloc[-1]}.")
                     self.position_maintained = False
                     trade_history = self.update_trade_history(trade_history, ticker)
                     self.update_metrics_on_sell(ticker)
 
-    def buy_logic(self, previous_ema, pre_previous_ema, current_price, previous_high, previous_low, trade_history):
+    def buy_logic(self, data, trade_history):
         if not self.position_maintained:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        if previous_ema > pre_previous_ema and current_price >= previous_high:
+        if buy_double_ema_breakout(data, 'ema9', 'ema21'):
             self.data_interface.create_order(self.symbol, 'buy', self.quantity)
-            stoploss = previous_low
-            stopgain = previous_high * 1.05
-            mid_stoploss = previous_low
-            potential_loss = calculate_percentage(current_price, stoploss)
-            potential_gain = calculate_percentage(current_price, stopgain)
-            logger.info(f"Compramos - Potencial de perda: {potential_loss:.2f}%, Potencial de ganho: {potential_gain:.2f}%")
+            stoploss = set_sell_stoploss_min_candles(data, 14)
+            stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, 3.5)
+            potential_loss = calculate_loss_percentage(data['close'].iloc[-1], stoploss)
+            potential_gain = calculate_gain_percentage(data['close'].iloc[-1], stopgain)
+            logger.info(f"Compramos na vela das {data['open_time'].iloc[-1]} em {data['close'].iloc[-1]} - Stop Loss em {stoploss}, Potencial de perda: {potential_loss:.2f}%, Stop Gain em {stopgain} Potencial de ganho: {potential_gain:.2f}%")
             new_row = pd.DataFrame({
                 'horario': [datetime.now()],
                 'moeda': [self.symbol],
-                'valor_compra': [current_price],
+                'valor_compra': [data['close'].iloc[-1]],
                 'valor_venda': [None],
                 'quantidade_moeda': [self.quantity],
-                'max_referencia': [previous_high],
-                'min_referencia': [previous_low],
+                'max_referencia': [data['high'].iloc[-2]],
+                'min_referencia': [set_sell_stoploss_min_candles(data, 14)],
                 'stoploss': [stoploss],
                 'stopgain': [stopgain],
-                'mid_stoploss': [mid_stoploss],
                 'potential_loss': [potential_loss],
                 'potential_gain': [potential_gain],
                 'timeframe': [self.interval],
@@ -89,8 +84,8 @@ class TradingStrategy:
             })
             trade_history = pd.concat([trade_history, new_row], ignore_index=True)
             trade_history.to_csv('data/trade_history.csv', index=False)
-            self.metrics.buy_prices.append(current_price)
-            self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
+            self.metrics.buy_prices.append(data['close'].iloc[-1])
+            self.update_metrics_on_buy(data['close'].iloc[-1], stoploss, stopgain, potential_loss, potential_gain)
             self.position_maintained = False
             return True, trade_history
 
@@ -109,7 +104,7 @@ class TradingStrategy:
         self.metrics.successful_sells_metric.labels(self.symbol).inc()
         self.metrics.sell_price_spread_metric.labels(self.symbol).set(max(self.metrics.sell_prices) - min(self.metrics.sell_prices) if self.metrics.sell_prices else 0)
 
-    def update_metrics_on_buy(self, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain):
+    def update_metrics_on_buy(self, current_price, stoploss, stopgain, potential_loss, potential_gain):
         self.metrics.current_stoploss_metric.labels(self.symbol).set(stoploss)
         self.metrics.current_stopgain_metric.labels(self.symbol).set(stopgain)
         self.metrics.last_buy_price_metric.labels(self.symbol).set(current_price)
@@ -118,4 +113,3 @@ class TradingStrategy:
         self.metrics.buy_price_spread_metric.labels(self.symbol).set(max(self.metrics.buy_prices) - min(self.metrics.buy_prices) if self.metrics.buy_prices else 0)
         self.metrics.potential_loss_metric.labels(self.symbol).set(potential_loss)
         self.metrics.potential_gain_metric.labels(self.symbol).set(potential_gain)
-        self.metrics.mid_stoploss_metric.labels(self.symbol).set(mid_stoploss)

@@ -2,21 +2,21 @@ from binance import Client
 import pandas as pd
 from datetime import datetime
 import time
+import os
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import utilities as Utilities
-import setups.larry_williams_heterodoxo as LarryWilliamsHeterodoxo
+import setups.emas as LarryWilliamsHeterodoxo
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
 script_start = time.time_ns()
 
 #TODO: trocar por variáveis de ambiente
-api_key = "ok9V7x0ETItBjXJJXp3HZNQbx1rAN26OiGIaPey7DMDm2d2612gU5aVQdT0E82bz"
-api_secret = "k15suaXdqzbwfvrYX0qcvNAkXET8EnqjO9JraQhduShjIGQ0YX0kiqXEntTdlRq0"
+api_key = os.getenv('BINANCE_API_KEY')
+api_secret = os.getenv('BINANCE_API_SECRET')
 
 client = Client(api_key, api_secret)
 
@@ -25,7 +25,7 @@ symbol = "BTCUSDT"
 interval = "15m"
 # interval = "5m"
 
-time_frame = 1000
+time_frame = 150
 candles_skip = time_frame - 1
 # candles_skip = 50 para precisão da EMA_9
 
@@ -36,52 +36,55 @@ data['low'] = data['low'].astype(float)
 data['high'] = data['high'].astype(float)
 data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
 data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
-data['EMA_90'] = data['close'].ewm(span=90, adjust=False).mean()
-data['EMA_200'] = data['close'].ewm(span=200, adjust=False).mean()
+# data['EMA_90'] = data['close'].ewm(span=90, adjust=False).mean()
+# data['EMA_200'] = data['close'].ewm(span=200, adjust=False).mean()
 
 saldo = 1000
 
 taxa_por_operacao = 0.0153 # futuros usdc
 
 print("Início do período:", datetime.fromtimestamp(data['open_time'].iloc[0] / 1000))
-print("Final do período: ", datetime.fromtimestamp(data['open_time'].iloc[-1] / 1000))
+print("Final do período - abertura última vela: ", datetime.fromtimestamp(data['open_time'].iloc[-1] / 1000))
 print("Preço atual:", data['close'].iloc[-1])
-print("-------------------")
-print("Iniciando avaliação de trades...")
+# print("-------------------")
+# print("Iniciando avaliação de trades...")
 
 comprado = False
 
 results = {}
 
-for i in range(candles_skip, time_frame):
-    year = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).year)
-    month = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).month)
+print(f"Ema 9: {data['EMA_9'].iloc[-2]}")
+print(f"Ema 21: {data['EMA_21'].iloc[-2]}")
 
-    if year not in results:
-        results[year] = {}
-    if month not in results[year]:
-        results[year][month] = {
-            'open_trades': 0,
-            'lucro': 0,
-            'successful_trades': 0,
-            'failed_trades': 0,
-            'perda_percentual_total': 0,
-        }
-    print(f"mínima das últimas velas: {min(data['low'].tail(3).tolist())}")
+# for i in range(candles_skip, time_frame):
+#     year = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).year)
+#     month = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).month)
 
-    # if not comprado and Utilities.is_weekday(data):
-    #     # if data['EMA_90'].iloc[i - 2] < data['close'].iloc[i - 2] and data['EMA_21'].iloc[i - 2] < data['close'].iloc[i - 2]:
-    #     if LarryWilliamsHeterodoxo.compra_ema_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
-    #         results[year][month]['open_trades'] += 1
-    #         buy_price = data['high'].iloc[i - 2]
-    #         stoploss = min(data['low'].iloc[i - 3], data['low'].iloc[i - 2], data['low'].iloc[i - 1])
-    #         if taxa_por_operacao != 0:
-    #             saldo -= saldo * taxa_por_operacao / 100
-    #         results[year][month]['saldo_final'] = saldo
-    #         stopgain = StopGain.set_venda_percentage(buy_price, 10)
-    #         comprado = True
-    #         # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
-    #         continue
+#     if year not in results:
+#         results[year] = {}
+#     if month not in results[year]:
+#         results[year][month] = {
+#             'open_trades': 0,
+#             'lucro': 0,
+#             'successful_trades': 0,
+#             'failed_trades': 0,
+#             'perda_percentual_total': 0,
+#         }
+#     print(f"mínima das últimas velas: {min(data['low'].tail(3).tolist())}")
+
+#     if not comprado and is_weekday(data):
+#         # if data['EMA_90'].iloc[i - 2] < data['close'].iloc[i - 2] and data['EMA_21'].iloc[i - 2] < data['close'].iloc[i - 2]:
+#         if LarryWilliamsHeterodoxo.buy_ema_breakout(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
+#             results[year][month]['open_trades'] += 1
+#             buy_price = data['high'].iloc[i - 2]
+#             stoploss = min(data['low'].iloc[i - 3], data['low'].iloc[i - 2], data['low'].iloc[i - 1])
+#             if taxa_por_operacao != 0:
+#                 saldo -= saldo * taxa_por_operacao / 100
+#             results[year][month]['saldo_final'] = saldo
+#             stopgain = StopGain.set_venda_percentage(buy_price, 10)
+#             comprado = True
+#             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
+#             continue
 
 #     if data['EMA_9'].iloc[i - 2] > data['EMA_9'].iloc[i - 3] and not comprado: # Encontrou a vela referência -> para gatilho e stop do trade::
 #     # if data['EMA_9'].iloc[i - 2] > data['EMA_9'].iloc[i - 3] and data['EMA_9'].iloc[i - 3] < data['EMA_9'].iloc[i - 4] and not comprado: # Encontrou a vela referência -> para gatilho e stop do trade

@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import utilities as Utilities
-import setups.larry_williams_heterodoxo as LarryWilliamsHeterodoxo
+import utils as utils
+import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
@@ -92,8 +92,8 @@ for i in range(50, len(data)):
         }
 
     if comprado:
-        if StopLoss.venda(data['low'].iloc[i - 1], stoploss):
-            loss_percentage = Utilities.calculate_loss_percentage(buy_price, stoploss)
+        if StopLoss.sell_stoploss(data['low'].iloc[i - 1], stoploss):
+            loss_percentage = utils.calculate_loss_percentage(buy_price, stoploss)
             results[year][month]['failed_trades'] += 1
             results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
             saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
@@ -102,9 +102,9 @@ for i in range(50, len(data)):
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
             continue
             
-        elif StopGain.venda(data['high'].iloc[i - 1], stopgain):
+        elif StopGain.sell_stopgain(data['high'].iloc[i - 1], stopgain):
             # profit = (data['close'].iloc[i - 1] - buy_price) / buy_price * 100
-            profit = Utilities.calculate_gain_percentage(buy_price, stopgain)
+            profit = utils.calculate_gain_percentage(buy_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
             saldo += saldo * ((profit - taxa_por_operacao) / 100)
@@ -114,7 +114,7 @@ for i in range(50, len(data)):
             continue
         
     if not comprado:
-        if LarryWilliamsHeterodoxo.compra_ema_rompimento(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
+        if emas.buy_ema_breakout(data['EMA_9'].iloc[i - 2], data['EMA_9'].iloc[i - 3], data['high'].iloc[i - 2], data['high'].iloc[i - 1]):
             results[year][month]['open_trades'] += 1
             buy_price = data['high'].iloc[i - 2]
             stoploss = data['low'].iloc[i - 2]
@@ -127,7 +127,7 @@ for i in range(50, len(data)):
             # stopgain = buy_price * 1.10 # para 1h
             # stopgain = buy_price * 1.05 # para 1h no ETH
             # stopgain = buy_price * 1.18 # para 15m
-            stopgain = StopGain.set_venda_percentage(buy_price, 18)
+            stopgain = StopGain.set_sell_stopgain_percentage(buy_price, 18)
             # stopgain = buy_price * 1.085 # para 15m no ETH
             # stopgain = buy_price * 1.085 # para 5m (valor atual no bot em operação real para ETH)
             # stopgain = buy_price * 1.05 # para 5m (valor atual no bot em operação real para BTC)
