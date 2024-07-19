@@ -1,6 +1,8 @@
 import pandas as pd
 from datetime import datetime
 from utils import calculate_percentage, logger, update_trade_history, safe_float_conversion
+import time
+
 
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
