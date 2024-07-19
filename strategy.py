@@ -1,7 +1,6 @@
 import pandas as pd
 from datetime import datetime
 from utils import calculate_percentage, logger, update_trade_history, safe_float_conversion
-import time
 
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
@@ -13,22 +12,6 @@ class TradingStrategy:
         self.setup = setup
         self.position_maintained = False
         self.last_log_time = time.time()  # Inicializa o temporizador de logs
-
-    def update_metrics_on_sell(self, ticker):
-        self.metrics.last_sell_price_metric.labels(self.symbol).set(ticker)
-        self.metrics.successful_sells_metric.labels(self.symbol).inc()
-        self.metrics.sell_price_spread_metric.labels(self.symbol).set(max(self.metrics.sell_prices) - min(self.metrics.sell_prices) if self.metrics.sell_prices else 0)
-
-    def update_metrics_on_buy(self, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain):
-        self.metrics.current_stoploss_metric.labels(self.symbol).set(stoploss)
-        self.metrics.current_stopgain_metric.labels(self.symbol).set(stopgain)
-        self.metrics.last_buy_price_metric.labels(self.symbol).set(current_price)
-        self.metrics.buy_attempts_metric.labels(self.symbol).inc()
-        self.metrics.successful_buys_metric.labels(self.symbol).inc()
-        self.metrics.buy_price_spread_metric.labels(self.symbol).set(max(self.metrics.buy_prices) - min(self.metrics.buy_prices) if self.metrics.buy_prices else 0)
-        self.metrics.potential_loss_metric.labels(self.symbol).set(potential_loss)
-        self.metrics.potential_gain_metric.labels(self.symbol).set(potential_gain)
-        self.metrics.mid_stoploss_metric.labels(self.symbol).set(mid_stoploss)
 
     def sell_logic(self, current_price, trade_history, previous_low, previous_high, current_time):
         if not self.position_maintained:
@@ -71,7 +54,7 @@ class TradingStrategy:
                         if current_time - self.last_log_time >= 120:
                             logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Stoploss: {stoploss}, Stopgain: {stopgain}, Mid Stoploss: {mid_stoploss}")
                         trade_history = update_trade_history(trade_history, ticker)  # Usa a função do utils.py
-                        self.update_metrics_on_sell(ticker)
+                        self.metrics.update_metrics_on_sell(ticker, self.symbol)
                         self.position_maintained = False
                         self.last_log_time = current_time
                         return False, trade_history  # Atualiza para indicar que não está mais comprado
@@ -156,7 +139,7 @@ class TradingStrategy:
                 logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
                 trade_history.to_csv('data/trade_history.csv', index=False)  # Salva no CSV apenas após uma compra
                 self.metrics.buy_prices.append(current_price)
-                self.update_metrics_on_buy(current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
+                self.metrics.update_metrics_on_buy(self.symbol, current_price, stoploss, stopgain, mid_stoploss, potential_loss, potential_gain)
                 self.position_maintained = False
                 return True, trade_history
             else:

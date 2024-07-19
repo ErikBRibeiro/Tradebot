@@ -3,7 +3,7 @@ from config import API_KEY, API_SECRET, SYMBOL, QUANTITY, INTERVAL, SETUP
 from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
-from utils import read_trade_history, logger, safe_float_conversion
+from utils import read_trade_history, logger
 
 def check_last_transaction(data_interface, symbol):
     try:
@@ -19,8 +19,8 @@ def check_last_transaction(data_interface, symbol):
         return False
 
 def main_loop():
+    start_prometheus_server(8000)
     metrics = Metrics(SYMBOL)
-    start_prometheus_server()
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, SYMBOL, QUANTITY, INTERVAL, SETUP)
 
@@ -70,10 +70,6 @@ def main_loop():
                     trade_history,
                     current_time
                 )
-
-            # Remover gravação redundante do trade_history
-            # if trade_history is not None and not trade_history.empty:
-            #     trade_history.to_csv('data/trade_history.csv', index=False)
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")
