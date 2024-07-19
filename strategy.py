@@ -103,12 +103,23 @@ class TradingStrategy:
             return False, trade_history
 
         # Calcular a EMA
-        trade_history['ema_9'] = trade_history['valor_compra'].ewm(span=9, adjust=False).mean()
-        previous_ema = trade_history['ema_9'].iloc[-2]
-        pre_previous_ema = trade_history['ema_9'].iloc[-3]
-        current_price = self.data_interface.get_current_price(self.symbol)
-        previous_high = trade_history['max_referencia'].iloc[-1]
-        previous_low = trade_history['min_referencia'].iloc[-1]
+        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=75)
+        data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+
+        data['close'] = data['close'].apply(safe_float_conversion)
+        data['low'] = data['low'].apply(safe_float_conversion)
+        data['high'] = data['high'].apply(safe_float_conversion)
+        data['volume'] = data['volume'].apply(safe_float_conversion)
+
+        if data[['close', 'low', 'high', 'volume']].isnull().any().any():
+            logger.error("Dados corrompidos recebidos da API Binance.")
+            return False, trade_history
+
+        previous_ema = data['close'].ewm(span=9, adjust=False).mean().iloc[-2]
+        pre_previous_ema = data['close'].ewm(span=9, adjust=False).mean().iloc[-3]
+        current_price = data['close'].iloc[-1]
+        previous_high = data['high'].iloc[-2]
+        previous_low = data['low'].iloc[-2]
 
         if current_time - self.last_log_time >= 120:
             logger.info(f"Valores de compra - previous_ema: {previous_ema}, pre_previous_ema: {pre_previous_ema}, current_price: {current_price}, previous_high: {previous_high}")
