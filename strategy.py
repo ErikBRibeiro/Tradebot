@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from utils import calculate_percentage, logger, update_trade_history
+from utils import calculate_percentage, logger, update_trade_history, safe_float_conversion
 import time
 
 class TradingStrategy:
