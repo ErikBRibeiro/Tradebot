@@ -1,7 +1,7 @@
+import os
 import pandas as pd
 import logging
-from datetime import datetime
-import os
+import datetime as datetime
 
 # Configure o logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,7 +19,7 @@ def calculate_profit_factor(total_profit, total_loss):
 def safe_float_conversion(value):
     try:
         return float(value)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 def read_trade_history():
@@ -29,12 +29,12 @@ def read_trade_history():
             return df
     return pd.DataFrame()
 
-def update_trade_history(df, sell_price, metrics):
+def update_trade_history(df, sell_price):
     df.at[df.index[-1], 'valor_venda'] = sell_price
     outcome = calculate_percentage(df.loc[df.index[-1], 'valor_compra'], sell_price)
     df.at[df.index[-1], 'outcome'] = outcome
     df.to_csv('data/trade_history.csv', index=False)
-    metrics.transaction_outcome_metric.labels(metrics.symbol).observe(outcome)
+    return df
 
 def log_trade(trade):
     with open('trades.log', 'a') as f:
