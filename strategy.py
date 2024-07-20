@@ -59,7 +59,7 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        if buy_double_ema_breakout(data, 'ema9', 'ema21'):
+        if buy_double_ema_breakout(data, 'EMA_9', 'EMA_21'):
             self.data_interface.create_order(self.symbol, 'buy', self.quantity)
             stoploss = set_sell_stoploss_min_candles(data, 14)
             stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, 3.5)
