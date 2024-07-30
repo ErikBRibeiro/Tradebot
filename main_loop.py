@@ -3,7 +3,7 @@ from config import API_KEY, API_SECRET, SYMBOL, QUANTITY, INTERVAL, SETUP
 from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
-from utils import read_trade_history, logger
+from src.utils import read_trade_history, logger
 
 def check_last_transaction(data_interface, symbol):
     try:

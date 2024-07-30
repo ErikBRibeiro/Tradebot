@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from utils import logger, update_trade_history, safe_float_conversion, calculate_gain_percentage, calculate_loss_percentage
+from src.utils import logger, update_trade_history, safe_float_conversion, calculate_gain_percentage, calculate_loss_percentage
 import time
 
 from setups.stopgain import sell_stopgain, set_sell_stopgain_ratio
