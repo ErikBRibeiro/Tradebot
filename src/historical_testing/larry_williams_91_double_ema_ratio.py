@@ -100,6 +100,11 @@ def plot_trades(data, trades):
         template='plotly_dark'
     )
 
+    fig.update_yaxes(
+        fixedrange=False,
+        autorange=True 
+    )
+
     fig.show()
 
 start_date = '2022-12-20'
