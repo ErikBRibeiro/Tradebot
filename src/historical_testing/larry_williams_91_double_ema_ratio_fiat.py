@@ -171,9 +171,9 @@ for i in range(999, len(data)):
             
             print(data['open_time'].iloc[i - 1], "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
 
-            trade['close_price'] = stoploss
+            trade['close_price'] = round(stoploss,2)
             trade['close_time'] = data['open_time'].iloc[i - 1]
-            trade['outcome'] = loss_percentage
+            trade['outcome'] = round(loss_percentage, 2)
             trade['result'] = 'StopLoss'
             trades.append(trade)
 
@@ -189,9 +189,9 @@ for i in range(999, len(data)):
 
             print(data['open_time'].iloc[i - 1], "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
 
-            trade['close_price'] = stopgain
+            trade['close_price'] = round(stopgain, 2)
             trade['close_time'] = data['open_time'].iloc[i - 1]
-            trade['outcome'] = profit
+            trade['outcome'] = round(profit, 2)
             trade['result'] = 'StopGain'
             trades.append(trade)
 
@@ -213,9 +213,9 @@ for i in range(999, len(data)):
             
             trade = {
                 'open_time': data['open_time'].iloc[i - 1],
-                'buy_price': buy_price,
-                'stoploss': stoploss,
-                'stopgain': stopgain,
+                'buy_price': round(buy_price,2),
+                'stoploss': round(stoploss,2),
+                'stopgain': round(stopgain,2),
                 'close_price': 0,
                 'close_time': 0,
                 'outcome': 0,
