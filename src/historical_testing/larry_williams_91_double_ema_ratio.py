@@ -86,9 +86,9 @@ def plot_trades(data, trades):
         ))
 
         if trade['result'] == 'StopLoss':
-            color = 'yellow'
+            color = 'rgb(255,0,100)'
         elif trade['result'] == 'StopGain':
-            color = 'yellow'
+            color = 'rgb(0,255,100)'
         
         fig.add_trace(go.Scatter(
             x=[trade['close_time']],
