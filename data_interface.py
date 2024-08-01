@@ -3,7 +3,7 @@ from binance.client import Client
 from binance import exceptions
 from requests.exceptions import ConnectionError, Timeout
 
-from utils import logger, safe_float_conversion
+from src.utils import logger, safe_float_conversion
 
 class LiveData:
     def __init__(self, api_key, api_secret):
