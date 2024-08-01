@@ -79,19 +79,19 @@ def plot_trades(data, trades):
             marker=dict(color='yellow', size=7, symbol='triangle-down'),
             name='Buy'
         ))
+
+        if trade['result'] == 'StopLoss':
+            color = 'yellow'
+        elif trade['result'] == 'StopGain':
+            color = 'yellow'
         
-        # fig.add_trace(go.Scatter(
-        #     x=[trade['open_time']],
-        #     y=[trade['buy_price']+500],
-        #     mode='markers',
-        #     marker=dict(color='yellow', size=50, symbol='triangle-up'),
-        #     name=trade['result'].capitalize()
-        # ))
-        # if trade['outcome'] > 0:
-        #     color = 'green'
-        # else:
-        #     color = 'red'
-        
+        fig.add_trace(go.Scatter(
+            x=[trade['close_time']],
+            y=[trade['close_price']],
+            mode='markers',
+            marker=dict(color=color, size=7),
+            name=trade['result']
+        ))
 
     fig.update_layout(
         title='Trades',
@@ -119,8 +119,8 @@ data['EMA_80'] = data['close'].ewm(span=90, adjust=False).mean()
 
 saldo = 1000
 
-taxa_por_operacao = 0.0153 # futuros usdc
-# taxa_por_operacao = 0.04125 # spot usdc
+# taxa_por_operacao = 0.0153 # futuros usdc
+taxa_por_operacao = 0.04125 # spot usdc
 # taxa_por_operacao = 0.045 # spot e futuros usdt
 # taxa_por_operacao = 0 # sem taxa de entrada e de saída
 
