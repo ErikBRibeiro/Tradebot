@@ -35,7 +35,7 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
         response = requests.get(url, params=params)
         
         if response.status_code != 200:
-            print(f"Error fetching data: {response.status_code}, {response.text}")
+            #print(f"Error fetching data: {response.status_code}, {response.text}")
             break
         
         new_data = response.json()
@@ -84,7 +84,7 @@ def plot_trades(data, trades):
         y=data['EMA_21'],
         mode='lines',
         name='EMA 21',
-        line=dict(color='yellow', width=1)
+        line=dict(color='rgb(255,255,255)', width=1)
     ))
 
     for trade in trades:
@@ -93,7 +93,7 @@ def plot_trades(data, trades):
             y=[trade['buy_price']],
             hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
             mode='markers',
-            marker=dict(color='rgb(0,0,255)', size=7, symbol='triangle-down'),
+            marker=dict(color='rgb(0,0,255)', size=15, symbol='triangle-down'),
             name='Buy'
         ))
 
@@ -141,17 +141,11 @@ def adjust_date(start_date):
     return new_date
 
 # Configurações iniciais
-start_date = '2024-01-23'
-end_date = '2024-03-13'
+start_date = '2024-07-01'
+#end_date = '2024-07-08'
+end_date = datetime.now().strftime('%Y-%m-%d')
 
-# Testando a função
 start_date = adjust_date(start_date)
-print(f"Data ajustada: {start_date}")
-
-# Configurações iniciais
-#start_date = '2024-07-08'
-#end_date = '2024-07-23'
-#end_date = datetime.now().strftime('%Y-%m-%d')
 
 ativo = 'BTCUSDT'
 timeframe = '15m'
@@ -203,7 +197,7 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
             
-            print(data['open_time'].iloc[i - 1], "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
+            print(data['open_time'].iloc[i - 1], "- VENDEMOS a", round(stoploss, 2), "com PREJUÍZO percentual de", round(loss_percentage, 2),"indo para xxx de saldo")
 
             trade['close_price'] = stoploss
             trade['close_time'] = data['open_time'].iloc[i - 1]
@@ -221,7 +215,7 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
 
-            print(data['open_time'].iloc[i - 1], "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
+            print(data['open_time'].iloc[i - 1], "- VENDEMOS a", round(stopgain, 2), "com LUCRO percentual de", round(profit, 2),"indo para xxx de saldo")
 
             trade['close_price'] = stopgain
             trade['close_time'] = data['open_time'].iloc[i - 1]
@@ -243,8 +237,7 @@ for i in range(999, len(data)):
             stopgain = StopGain.set_sell_stopgain_ratio(buy_price, stoploss, ratio)
             comprado = True
 
-            print(data['open_time'].iloc[i - 1], "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
-            
+            print(data['open_time'].iloc[i - 1], "- COMPRAMOS a", round(buy_price, 2), "com stoploss em", round(stoploss, 2), "(porcentagem de perda)" "e stopgain em", round(stopgain, 2),"(porcentagem de ganho)")
             trade = {
                 'open_time': data['open_time'].iloc[i - 1],
                 'buy_price': buy_price,
