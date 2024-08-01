@@ -80,6 +80,7 @@ def plot_trades(data, trades):
         fig.add_trace(go.Scatter(
             x=[trade['open_time']],
             y=[trade['buy_price']],
+            hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
             mode='markers',
             marker=dict(color='yellow', size=7, symbol='triangle-down'),
             name='Buy'
@@ -93,6 +94,7 @@ def plot_trades(data, trades):
         fig.add_trace(go.Scatter(
             x=[trade['close_time']],
             y=[trade['close_price']],
+            hovertext=[{'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
             mode='markers',
             marker=dict(color=color, size=7),
             name=trade['result']
