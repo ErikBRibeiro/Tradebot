@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import plotly.graph_objects as go
 
@@ -12,6 +12,8 @@ import utils as utils
 import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
+
+
 
 def fetch_candles(symbol, interval, start_str, end_str=None):
     url = 'https://fapi.binance.com/fapi/v1/klines'  
@@ -91,14 +93,14 @@ def plot_trades(data, trades):
             y=[trade['buy_price']],
             hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
             mode='markers',
-            marker=dict(color='yellow', size=7, symbol='triangle-down'),
+            marker=dict(color='rgb(0,0,255)', size=7, symbol='triangle-down'),
             name='Buy'
         ))
 
         if trade['result'] == 'StopLoss':
-            color = 'rgb(255,0,100)'
+            color = 'rgb(255,0,255)'
         elif trade['result'] == 'StopGain':
-            color = 'rgb(0,255,100)'
+            color = 'rgb(0,255,255)'
         
         fig.add_trace(go.Scatter(
             x=[trade['close_time']],
@@ -123,9 +125,33 @@ def plot_trades(data, trades):
 
     fig.show()
 
+def adjust_date(start_date):
+    # Converte a data inicial para um objeto datetime
+    start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
+    
+    # Número de dias a subtrair
+    days_to_subtract = 10.40625
+    
+    # Calcula a nova data subtraindo os dias
+    new_datetime = start_datetime - timedelta(days=days_to_subtract)
+    
+    # Converte a nova data de volta para string no formato original
+    new_date = new_datetime.strftime('%Y-%m-%d')
+    
+    return new_date
+
 # Configurações iniciais
-start_date = '2022-12-20'
-end_date = datetime.now().strftime('%Y-%m-%d')
+start_date = '2024-01-23'
+end_date = '2024-03-13'
+
+# Testando a função
+start_date = adjust_date(start_date)
+print(f"Data ajustada: {start_date}")
+
+# Configurações iniciais
+#start_date = '2024-07-08'
+#end_date = '2024-07-23'
+#end_date = datetime.now().strftime('%Y-%m-%d')
 
 ativo = 'BTCUSDT'
 timeframe = '15m'
