@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime
 import requests
+import plotly.graph_objects as go
 
 import sys
 from pathlib import Path
@@ -43,6 +44,64 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df = df[['open', 'high', 'low', 'close', 'open_time', 'close_time']]
     return df
 
+def plot_trades(data, trades):
+    fig = go.Figure()
+
+    fig.add_trace(go.Candlestick(
+        x=data['open_time'],
+        open=data['open'],
+        high=data['high'],
+        low=data['low'],
+        close=data['close'],
+        name='Candlesticks'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=data['open_time'],
+        y=data['EMA_9'],
+        mode='lines',
+        name='EMA 9',
+        line=dict(color='green', width=1)
+    ))
+    fig.add_trace(go.Scatter(
+        x=data['open_time'],
+        y=data['EMA_21'],
+        mode='lines',
+        name='EMA 21',
+        line=dict(color='yellow', width=1)
+    ))
+
+    for trade in trades:
+        fig.add_trace(go.Scatter(
+            x=[trade['open_time']],
+            y=[trade['buy_price']],
+            mode='markers',
+            marker=dict(color='yellow', size=7, symbol='triangle-down'),
+            name='Buy'
+        ))
+        
+        # fig.add_trace(go.Scatter(
+        #     x=[trade['open_time']],
+        #     y=[trade['buy_price']+500],
+        #     mode='markers',
+        #     marker=dict(color='yellow', size=50, symbol='triangle-up'),
+        #     name=trade['result'].capitalize()
+        # ))
+        # if trade['outcome'] > 0:
+        #     color = 'green'
+        # else:
+        #     color = 'red'
+        
+
+    fig.update_layout(
+        title='Trades',
+        xaxis_title='Time',
+        yaxis_title='Price',
+        template='plotly_dark'
+    )
+
+    fig.show()
+
 start_date = '2022-12-20'
 # end_date = '2024-06-27'
 end_date = datetime.now().strftime('%Y-%m-%d')
@@ -76,6 +135,17 @@ print("Iniciando avaliação de trades...")
 comprado = False
 
 results = {}
+trades = []
+trade = {
+    'open_time': 0,
+    'buy_price': 0,
+    'stoploss': 0,
+    'stopgain': 0,
+    'close_price': 0,
+    'close_time': 0,
+    'outcome': 0,
+    'result': ''
+}
 
 for i in range(999, len(data)):
     year = int(datetime.fromtimestamp(data['close_time'].iloc[i - 1] / 1000).year)
@@ -103,6 +173,13 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stoploss, "com PREJUÍZO percentual de", loss_percentage)
+            
+            trade['close_price'] = stoploss
+            trade['close_time'] = data['open_time'].iloc[i - 1]
+            trade['outcome'] = loss_percentage
+            trade['result'] = 'StopLoss'
+            trades.append(trade)
+
             continue
             
         elif StopGain.sell_stopgain(data['high'].iloc[i - 1], stopgain):
@@ -114,6 +191,13 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- Vendemos a", stopgain, "com LUCRO percentual de", profit)
+
+            trade['close_price'] = stopgain
+            trade['close_time'] = data['open_time'].iloc[i - 1]
+            trade['outcome'] = profit
+            trade['result'] = 'StopGain'
+            trades.append(trade)
+
             continue
 
         # elif LarryWilliamsHeterodoxo.venda_ema_fechamento(data['EMA_9'].iloc[i - 2], data['close'].iloc[i - 2]):
@@ -151,6 +235,16 @@ for i in range(999, len(data)):
             stopgain = StopGain.set_sell_stopgain_ratio(buy_price, stoploss, ratio)
             comprado = True
             # print(datetime.fromtimestamp(data['open_time'].iloc[i - 1] / 1000), "- COMPRAMOS a", buy_price, "com stoploss em", stoploss, "e stopgain em", stopgain)
+            trade = {
+                'open_time': data['open_time'].iloc[i - 1],
+                'buy_price': buy_price,
+                'stoploss': stoploss,
+                'stopgain': stopgain,
+                'close_price': 0,
+                'close_time': 0,
+                'outcome': 0,
+                'result': ''
+            }
             continue
 
 descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
@@ -250,3 +344,7 @@ print(f"Saldo final: {results[list(results.keys())[-1]][list(results[list(result
 print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
+
+# print(f"Trades: {trades}")
+
+plot_trades(data, trades)
