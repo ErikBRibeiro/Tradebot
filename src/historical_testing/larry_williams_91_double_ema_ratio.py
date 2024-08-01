@@ -14,7 +14,7 @@ import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
 def fetch_candles(symbol, interval, start_str, end_str=None):
-    url = 'https://api.binance.com/api/v3/klines'
+    url = 'https://fapi.binance.com/fapi/v1/klines'  
     data = []
     limit = 1000
     start_time = int(pd.to_datetime(start_str).timestamp() * 1000)
@@ -29,21 +29,30 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
         }
         if end_time:
             params['endTime'] = end_time
-
+        
         response = requests.get(url, params=params)
+        
+        if response.status_code != 200:
+            print(f"Error fetching data: {response.status_code}, {response.text}")
+            break
+        
         new_data = response.json()
         if not new_data:
             break
+        
         data.extend(new_data)
-        start_time = new_data[-1][0] + 1
-
+        start_time = new_data[-1][0] + 1  # Add 1 ms to avoid overlap
+        
+    if not data:
+        print("No data fetched.")
+        return pd.DataFrame()  # Return empty DataFrame
+    
     columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time',
                'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume',
                'taker_buy_quote_asset_volume', 'ignore']
     df = pd.DataFrame(data, columns=columns)
     df = df[['open', 'high', 'low', 'close', 'open_time', 'close_time']]
     
-    # Convertendo timestamps para datas legíveis
     df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
     df['close_time'] = pd.to_datetime(df['close_time'], unit='ms')
     
@@ -114,13 +123,19 @@ def plot_trades(data, trades):
 
     fig.show()
 
+# Configurações iniciais
 start_date = '2022-12-20'
 end_date = datetime.now().strftime('%Y-%m-%d')
 
 ativo = 'BTCUSDT'
 timeframe = '15m'
+alavancagem = 1  # Ajuste a alavancagem conforme necessário
 
 data = fetch_candles(ativo, timeframe, start_date, end_date)
+if data.empty:
+    print("No data available for the given period.")
+    sys.exit()
+
 data['close'] = data['close'].astype(float)
 data['low'] = data['low'].astype(float)
 data['high'] = data['high'].astype(float)
@@ -128,15 +143,8 @@ data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
 data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
 data['EMA_80'] = data['close'].ewm(span=80, adjust=False).mean()
 
-saldo = 1000
-
-taxa_por_operacao = 0.04125 # spot usdc
-
-print("Início do período:", data['open_time'].iloc[0])
-print("Final do período: ", data['open_time'].iloc[-1])
-print("Preço atual:", data['close'].iloc[-1])
-print("-------------------")
-print("Iniciando avaliação de trades...")
+saldo = 1000 * alavancagem  # Ajustando o saldo para considerar a alavancagem
+taxa_por_operacao = 0.016  # Taxa padrão
 
 comprado = False
 
