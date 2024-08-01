@@ -13,8 +13,6 @@ import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
-
-
 def fetch_candles(symbol, interval, start_str, end_str=None):
     url = 'https://fapi.binance.com/fapi/v1/klines'  
     data = []
@@ -126,25 +124,14 @@ def plot_trades(data, trades):
     fig.show()
 
 def adjust_date(start_date):
-    # Converte a data inicial para um objeto datetime
     start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-    
-    # Número de dias a subtrair
     days_to_subtract = 10.40625
-    
-    # Calcula a nova data subtraindo os dias
     new_datetime = start_datetime - timedelta(days=days_to_subtract)
-    
-    # Converte a nova data de volta para string no formato original
-    new_date = new_datetime.strftime('%Y-%m-%d')
-    
-    return new_date
+    return new_datetime.strftime('%Y-%m-%d')
 
 # Configurações iniciais
 start_date = '2024-07-01'
-#end_date = '2024-07-08'
 end_date = datetime.now().strftime('%Y-%m-%d')
-
 start_date = adjust_date(start_date)
 
 ativo = 'BTCUSDT'
@@ -197,7 +184,7 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
             
-            print(data['open_time'].iloc[i - 1], "- VENDEMOS a", round(stoploss, 2), "com PREJUÍZO percentual de", round(loss_percentage, 2),"indo para xxx de saldo")
+            print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
             trade['close_time'] = data['open_time'].iloc[i - 1]
@@ -215,7 +202,7 @@ for i in range(999, len(data)):
             results[year][month]['saldo_final'] = saldo
             comprado = False
 
-            print(data['open_time'].iloc[i - 1], "- VENDEMOS a", round(stopgain, 2), "com LUCRO percentual de", round(profit, 2),"indo para xxx de saldo")
+            print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
             trade['close_time'] = data['open_time'].iloc[i - 1]
@@ -237,7 +224,11 @@ for i in range(999, len(data)):
             stopgain = StopGain.set_sell_stopgain_ratio(buy_price, stoploss, ratio)
             comprado = True
 
-            print(data['open_time'].iloc[i - 1], "- COMPRAMOS a", round(buy_price, 2), "com stoploss em", round(stoploss, 2), "(porcentagem de perda)" "e stopgain em", round(stopgain, 2),"(porcentagem de ganho)")
+            loss_percentage = utils.calculate_loss_percentage(buy_price, stoploss)
+            gain_percentage = utils.calculate_gain_percentage(buy_price, stopgain)
+
+            print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(buy_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
+
             trade = {
                 'open_time': data['open_time'].iloc[i - 1],
                 'buy_price': buy_price,
