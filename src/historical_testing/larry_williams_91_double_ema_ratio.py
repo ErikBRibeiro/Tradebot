@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import requests
 import plotly.graph_objects as go
+import numpy as np
 
 import sys
 from pathlib import Path
@@ -103,7 +104,7 @@ def plot_trades(data, trades):
         fig.add_trace(go.Scatter(
             x=[trade['close_time']],
             y=[trade['close_price']],
-            hovertext=[{'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
+            hovertext=[{'Fechou em': trade['close_price'], 'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
             mode='markers',
             marker=dict(color=color, size=7),
             name=trade['result']
@@ -129,6 +130,13 @@ def adjust_date(start_date):
     new_datetime = start_datetime - timedelta(days=days_to_subtract)
     return new_datetime.strftime('%Y-%m-%d')
 
+def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
+    excess_returns = returns - risk_free_rate
+    mean_excess_return = np.mean(excess_returns)
+    std_excess_return = np.std(excess_returns)
+    sharpe_ratio = mean_excess_return / std_excess_return if std_excess_return != 0 else 0
+    return sharpe_ratio
+
 # Configurações iniciais
 start_date = '2024-07-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
@@ -153,6 +161,14 @@ data['EMA_80'] = data['close'].ewm(span=80, adjust=False).mean()
 saldo = 1000 * alavancagem  # Ajustando o saldo para considerar a alavancagem
 taxa_por_operacao = 0.016  # Taxa padrão
 
+max_saldo = saldo
+min_saldo_since_max = saldo
+max_drawdown = 0
+perdas = []
+ganhos = []
+
+risk_free_rate = 0.05 # determinar taxa de juros de títulos públicos para o período testado
+
 comprado = False
 
 results = {}
@@ -172,7 +188,8 @@ for i in range(999, len(data)):
             'failed_trades': 0,
             'perda_percentual_total': 0,
             'saldo_inicial': saldo,
-            'saldo_final': saldo
+            'saldo_final': saldo,
+            'max_drawdown': 0
         }
 
     if comprado:
@@ -191,6 +208,15 @@ for i in range(999, len(data)):
             trade['outcome'] = loss_percentage
             trade['result'] = 'StopLoss'
             trades.append(trade)
+            perdas.append(-(loss_percentage + taxa_por_operacao))
+
+            if saldo < min_saldo_since_max:
+                min_saldo_since_max = saldo
+                drawdown = (max_saldo - min_saldo_since_max) / max_saldo * 100
+                
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+                    results[year][month]['max_drawdown'] = max_drawdown
 
             continue
             
@@ -209,6 +235,12 @@ for i in range(999, len(data)):
             trade['outcome'] = profit
             trade['result'] = 'StopGain'
             trades.append(trade)
+
+            ganhos.append(profit - taxa_por_operacao)
+
+            if saldo > max_saldo:
+                max_saldo = saldo
+                min_saldo_since_max = saldo
 
             continue
 
@@ -242,6 +274,8 @@ for i in range(999, len(data)):
             continue
 
 descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
+
+overall_sharpe_ratio = calculate_sharpe_ratio(np.array(ganhos + perdas), 0.15)
 
 for year in results:
     print(f"Ano: {year}")
@@ -293,6 +327,7 @@ for year in results:
             avg_loss_per_trade = 0
 
         print(f"    Perda média por trade: {avg_loss_per_trade:.2f}%")
+        print(f"    Drawdown máximo: {results[year][month]['max_drawdown']:.2f}%")
 
         if results[year][month]['saldo_inicial'] <= results[year][month]['saldo_final']:
             print(f"    Resultado final: {(results[year][month]['saldo_final'] / results[year][month]['saldo_inicial'] - 1) * 100:.2f}%")
@@ -305,7 +340,7 @@ for year in results:
 
 print("Total:")
 print(f"Operações realizadas: {sum([results[year][month]['open_trades'] for year in results for month in results[year]])}")
-
+print(f"Sharpe Ratio: {overall_sharpe_ratio:.2f}")
 try:
     print(f"Taxa de acerto: {sum([results[year][month]['successful_trades'] for year in results for month in results[year]]) / sum([results[year][month]['open_trades'] for year in results for month in results[year]]) * 100:.2f}%")
 except ZeroDivisionError:
@@ -324,6 +359,7 @@ try:
     print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]]):.2f}%")
 except ZeroDivisionError:
     print(f"Perda média por trade: 0")
+print(f"Drawdown máximo: {max_drawdown:.2f}%")
 
 saldo_inicial = results[list(results.keys())[0]][list(results[list(results.keys())[0]].keys())[0]]['saldo_inicial']
 saldo_final = results[list(results.keys())[-1]][list(results[list(results.keys())[-1]].keys())[-1]]['saldo_final']
