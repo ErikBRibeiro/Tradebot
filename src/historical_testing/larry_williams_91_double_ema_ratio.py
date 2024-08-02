@@ -228,12 +228,13 @@ for i in range(999, len(data)):
 
             if saldo < min_saldo_since_max:
                 min_saldo_since_max = saldo
-                drawdown = (max_saldo - min_saldo_since_max) / max_saldo * 100
+            
+            drawdown = (max_saldo - min_saldo_since_max) / max_saldo * 100
                 
-                if drawdown > max_drawdown:
-                    max_drawdown = drawdown
+            if drawdown > max_drawdown:
+                 max_drawdown = drawdown
                     
-                results[year][month]['max_drawdown'] = max_drawdown
+            results[year][month]['max_drawdown'] = max_drawdown
 
             continue
             
@@ -315,6 +316,7 @@ for year in results:
         avg_loss_per_trade = 0
 
     print(f"  Perda média por trade: {avg_loss_per_trade:.2f}%")
+    print(f"  Drawdown máximo do ano: {max([results[year][month]['max_drawdown'] for month in results[year]])}%")
     
     if results[year][list(results[year].keys())[0]]['saldo_inicial'] <= results[year][list(results[year].keys())[-1]]['saldo_final']:
         print(f"  Resultado final: {((results[year][list(results[year].keys())[-1]]['saldo_final'] / results[year][list(results[year].keys())[0]]['saldo_inicial']) - 1) * 100:.2f}%")
