@@ -94,7 +94,11 @@ def plot_trades(data, trades, start_date):
             fig.add_trace(go.Scatter(
                 x=[trade['open_time']],
                 y=[trade['buy_price']],
-                hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
+                hovertext=[{
+                    'Preço de Compra': f"{trade['buy_price']:.2f}", 
+                    'Stoploss': f"{trade['stoploss']:.2f}", 
+                    'Stopgain': f"{trade['stopgain']:.2f}"
+                }],
                 mode='markers',
                 marker=dict(color='rgb(100, 149, 237)', size=15, symbol='circle'),  # Azul mais forte
                 name='Buy'
@@ -103,14 +107,20 @@ def plot_trades(data, trades, start_date):
             if trade['result'] == 'StopLoss':
                 color = 'rgb(255, 69, 0)'  # Vermelho mais forte
                 symbol = 'triangle-down'
+                result_text = f"-{trade['outcome']:.2f}%"
             elif trade['result'] == 'StopGain':
                 color = 'rgb(60, 179, 113)'  # Verde mais forte
                 symbol = 'triangle-up'
+                result_text = f"+{trade['outcome']:.2f}%"
             
             fig.add_trace(go.Scatter(
                 x=[trade['close_time']],
                 y=[trade['close_price']],
-                hovertext=[{'Fechou em': trade['close_price'], 'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
+                hovertext=[{
+                    'Fechou em': f"{trade['close_price']:.2f}", 
+                    'Preço de Compra': f"{trade['buy_price']:.2f}", 
+                    'Resultado': result_text
+                }],
                 mode='markers',
                 marker=dict(color=color, size=15, symbol=symbol),
                 name=trade['result']
@@ -144,7 +154,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2020-08-01'
+start_date = '2024-07-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
