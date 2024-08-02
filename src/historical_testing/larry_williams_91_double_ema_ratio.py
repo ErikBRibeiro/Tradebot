@@ -8,23 +8,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# from utils import calculate_gain_percentage, calculate_loss_percentage
 import utils as utils
 import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
-'''
-alterações:   
-simbolos stopgain -> triangle up
-stoploss -> triangle down  
-buy -> circle. ok
-cor EMA9 -> amarelo ok
-cor Stoploss -> amarelo ~ laranja 
-cor Stopgain -> atual cor do buy
-cor buy -> rosa parecido com o stoploss atual, porem mais claro
-tamanho 15 em tudo
-'''
 def fetch_candles(symbol, interval, start_str, end_str=None):
     url = 'https://fapi.binance.com/fapi/v1/klines'  
     data = []
@@ -45,7 +33,6 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
         response = requests.get(url, params=params)
         
         if response.status_code != 200:
-            #print(f"Error fetching data: {response.status_code}, {response.text}")
             break
         
         new_data = response.json()
@@ -56,7 +43,6 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
         start_time = new_data[-1][0] + 1  # Add 1 ms to avoid overlap
         
     if not data:
-        print("No data fetched.")
         return pd.DataFrame()  # Return empty DataFrame
     
     columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time',
@@ -70,8 +56,10 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     
     return df
 
-def plot_trades(data, trades):
+def plot_trades(data, trades, start_date):
     fig = go.Figure()
+
+    data = data[data['open_time'] >= start_date]  # Filtra os dados a partir do start_date
 
     fig.add_trace(go.Candlestick(
         x=data['open_time'],
@@ -79,7 +67,11 @@ def plot_trades(data, trades):
         high=data['high'],
         low=data['low'],
         close=data['close'],
-        name='Candlesticks'
+        name='Candlesticks',
+        increasing_line_color='rgba(144, 238, 144, 0.7)',  # Verde um pouco mais claro
+        decreasing_line_color='rgba(255, 99, 71, 0.7)',  # Vermelho um pouco mais claro
+        increasing_fillcolor='rgba(144, 238, 144, 0.5)',
+        decreasing_fillcolor='rgba(255, 99, 71, 0.5)',
     ))
 
     fig.add_trace(go.Scatter(
@@ -98,30 +90,31 @@ def plot_trades(data, trades):
     ))
 
     for trade in trades:
-        fig.add_trace(go.Scatter(
-            x=[trade['open_time']],
-            y=[trade['buy_price']],
-            hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
-            mode='markers',
-            marker=dict(color='rgb(255,182,193)', size=15, symbol='circle'),
-            name='Buy'
-        ))
+        if trade['open_time'] >= start_date:  # Plota apenas trades a partir do start_date
+            fig.add_trace(go.Scatter(
+                x=[trade['open_time']],
+                y=[trade['buy_price']],
+                hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
+                mode='markers',
+                marker=dict(color='rgb(100, 149, 237)', size=15, symbol='circle'),  # Azul mais forte
+                name='Buy'
+            ))
 
-        if trade['result'] == 'StopLoss':
-            color = 'rgb(255,165,0)'  # Amarelo alaranjado
-            symbol = 'triangle-down'
-        elif trade['result'] == 'StopGain':
-            color = 'rgb(30,144,255)'  # Azul
-            symbol = 'triangle-up'
-        
-        fig.add_trace(go.Scatter(
-            x=[trade['close_time']],
-            y=[trade['close_price']],
-            hovertext=[{'Fechou em': trade['close_price'], 'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
-            mode='markers',
-            marker=dict(color=color, size=15, symbol=symbol),
-            name=trade['result']
-        ))
+            if trade['result'] == 'StopLoss':
+                color = 'rgb(255, 69, 0)'  # Vermelho mais forte
+                symbol = 'triangle-down'
+            elif trade['result'] == 'StopGain':
+                color = 'rgb(60, 179, 113)'  # Verde mais forte
+                symbol = 'triangle-up'
+            
+            fig.add_trace(go.Scatter(
+                x=[trade['close_time']],
+                y=[trade['close_price']],
+                hovertext=[{'Fechou em': trade['close_price'], 'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
+                mode='markers',
+                marker=dict(color=color, size=15, symbol=symbol),
+                name=trade['result']
+            ))
 
     fig.update_layout(
         title='Trades',
@@ -137,7 +130,6 @@ def plot_trades(data, trades):
 
     fig.show()
 
-
 def adjust_date(start_date):
     start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
     days_to_subtract = 10.40625
@@ -152,15 +144,15 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2024-07-01'
+start_date = '2020-08-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
-start_date = adjust_date(start_date)
+adjusted_start_date = adjust_date(start_date)
 
 ativo = 'BTCUSDT'
 timeframe = '15m'
 alavancagem = 1  # Ajuste a alavancagem conforme necessário
 
-data = fetch_candles(ativo, timeframe, start_date, end_date)
+data = fetch_candles(ativo, timeframe, adjusted_start_date, end_date)
 if data.empty:
     print("No data available for the given period.")
     sys.exit()
@@ -181,7 +173,7 @@ max_drawdown = 0
 perdas = []
 ganhos = []
 
-risk_free_rate = 0.05 # determinar taxa de juros de títulos públicos para o período testado
+risk_free_rate = 0.05  # determinar taxa de juros de títulos públicos para o período testado
 
 comprado = False
 
@@ -297,7 +289,7 @@ for year in results:
     print(f"  Trades de sucesso: {sum([results[year][month]['successful_trades'] for month in results[year]])}")
     print(f"  Soma dos ganhos: {sum([results[year][month]['lucro'] for month in results[year]]):.2f}%")
     try:
-        print(f"  Ganho médio por trade: {sum([results[year][month]['lucro'] for month in results[year]]) / sum([results[year][month]['successful_trades'] for month in results[year]]):.2f}%")
+        print(f"  Ganho médio por trade: {sum([results[year][month]['lucro'] for month in results[year]]) / sum([results[year][month]['successful_trades'] for month in results[year]]) :.2f}%")
     except ZeroDivisionError:
         print(f"  Ganho médio por trade: 0")
     print(f"  Trades em prejuízo: {sum([results[year][month]['failed_trades'] for month in results[year]])}")
@@ -363,14 +355,14 @@ print(f"Trades de sucesso: {sum([results[year][month]['successful_trades'] for y
 print(f"Soma dos ganhos: {sum([results[year][month]['lucro'] for year in results for month in results[year]]):.2f}%")
 
 try:
-    print(f"Ganho médio por trade: {sum([results[year][month]['lucro'] for year in results for month in results[year]]) / sum([results[year][month]['successful_trades'] for year in results for month in results[year]]):.2f}%")
+    print(f"Ganho médio por trade: {sum([results[year][month]['lucro'] for year in results for month in results[year]]) / sum([results[year][month]['successful_trades'] for year in results for month in results[year]]) :.2f}%")
 except ZeroDivisionError:
     print(f"Ganho médio por trade: 0")
 
 print(f"Trades em prejuízo: {sum([results[year][month]['failed_trades'] for year in results for month in results[year]])}")
 print(f"Soma das perdas: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]):.2f}%")
 try:
-    print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]]):.2f}%")
+    print(f"Perda média por trade: {sum([results[year][month]['perda_percentual_total'] for year in results for month in results[year]]) / sum([results[year][month]['failed_trades'] for year in results for month in results[year]]) :.2f}%")
 except ZeroDivisionError:
     print(f"Perda média por trade: 0")
 print(f"Drawdown máximo: {max_drawdown:.2f}%")
@@ -389,4 +381,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-plot_trades(data, trades)
+plot_trades(data, trades, pd.to_datetime(start_date))
