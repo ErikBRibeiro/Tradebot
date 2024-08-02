@@ -232,7 +232,8 @@ for i in range(999, len(data)):
                 
                 if drawdown > max_drawdown:
                     max_drawdown = drawdown
-                    results[year][month]['max_drawdown'] = max_drawdown
+                    
+                results[year][month]['max_drawdown'] = max_drawdown
 
             continue
             
