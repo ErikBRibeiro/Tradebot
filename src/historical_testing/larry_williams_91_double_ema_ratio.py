@@ -13,6 +13,17 @@ import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
+'''
+alterações:   
+simbolos stopgain -> triangle up
+stoploss -> triangle down  
+buy -> circle. ok
+cor EMA9 -> amarelo ok
+cor Stoploss -> amarelo ~ laranja 
+cor Stopgain -> atual cor do buy
+cor buy -> rosa parecido com o stoploss atual, porem mais claro
+tamanho 15 em tudo
+'''
 def fetch_candles(symbol, interval, start_str, end_str=None):
     url = 'https://fapi.binance.com/fapi/v1/klines'  
     data = []
@@ -75,14 +86,14 @@ def plot_trades(data, trades):
         y=data['EMA_9'],
         mode='lines',
         name='EMA 9',
-        line=dict(color='green', width=1)
+        line=dict(color='yellow', width=1)
     ))
     fig.add_trace(go.Scatter(
         x=data['open_time'],
         y=data['EMA_21'],
         mode='lines',
         name='EMA 21',
-        line=dict(color='rgb(255,255,255)', width=1)
+        line=dict(color='rgb(148,0,211)', width=1)
     ))
 
     for trade in trades:
@@ -91,21 +102,23 @@ def plot_trades(data, trades):
             y=[trade['buy_price']],
             hovertext=[{'Preço de Compra': trade['buy_price'], 'Stoploss': trade['stoploss'], 'Stopgain': trade['stopgain']}],
             mode='markers',
-            marker=dict(color='rgb(0,0,255)', size=15, symbol='triangle-down'),
+            marker=dict(color='rgb(255,182,193)', size=15, symbol='circle'),
             name='Buy'
         ))
 
         if trade['result'] == 'StopLoss':
-            color = 'rgb(255,0,255)'
+            color = 'rgb(255,165,0)'  # Amarelo alaranjado
+            symbol = 'triangle-down'
         elif trade['result'] == 'StopGain':
-            color = 'rgb(0,255,255)'
+            color = 'rgb(30,144,255)'  # Azul
+            symbol = 'triangle-up'
         
         fig.add_trace(go.Scatter(
             x=[trade['close_time']],
             y=[trade['close_price']],
             hovertext=[{'Preço de Compra': trade['buy_price'], 'Resultado:' : trade['outcome']}],
             mode='markers',
-            marker=dict(color=color, size=7),
+            marker=dict(color=color, size=15, symbol=symbol),
             name=trade['result']
         ))
 
@@ -122,6 +135,7 @@ def plot_trades(data, trades):
     )
 
     fig.show()
+
 
 def adjust_date(start_date):
     start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
