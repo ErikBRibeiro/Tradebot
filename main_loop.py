@@ -1,3 +1,4 @@
+import threading
 import time
 from config import API_KEY, API_SECRET, SYMBOL, QUANTITY, INTERVAL, SETUP
 from data_interface import LiveData
@@ -30,6 +31,11 @@ def main_loop():
     trade_history = read_trade_history()
 
     last_log_time = time.time()  # Inicializa o temporizador de logs
+
+    # Inicia a atualização contínua do preço em uma thread separada
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(SYMBOL, 20))
+    price_thread.daemon = True
+    price_thread.start()
 
     while True:
         try:

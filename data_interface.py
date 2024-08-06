@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 from binance.client import Client
 from binance import exceptions
@@ -8,6 +9,7 @@ from src.utils import logger, safe_float_conversion
 class LiveData:
     def __init__(self, api_key, api_secret):
         self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
+        self.current_price = None
 
     def get_historical_data(self, symbol, interval, limit=150):
         try:
@@ -89,3 +91,12 @@ class LiveData:
         except Exception as e:
             logger.error(f"Erro inesperado ao criar ordem: {e}")
             return None
+
+    def update_price_continuously(self, symbol, frequency_per_second=20):
+        interval = 1 / frequency_per_second
+        while True:
+            try:
+                self.current_price = self.get_current_price(symbol)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar o preço continuamente: {e}")
+            time.sleep(interval)
