@@ -6,4 +6,4 @@ short_period = 5
 long_period = 15
 ratio = 4.1
 stop_candles = 17
-setup = 'ema'
+setup = '9.1'

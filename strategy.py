@@ -8,14 +8,11 @@ from src.setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
 from src.setups.emas import buy_double_ema_breakout
 from src.parameters import short_period, long_period, ratio, stop_candles
 
-
-
 class TradingStrategy:
-    def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
+    def __init__(self, data_interface, metrics, symbol, interval, setup):
         self.data_interface = data_interface
         self.metrics = metrics
         self.symbol = symbol
-        self.quantity = quantity
         self.interval = interval
         self.setup = setup
         self.position_maintained = False
