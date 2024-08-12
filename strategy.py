@@ -1,16 +1,8 @@
 import sys
-import os
+from pathlib import Path
 
-print("Current Working Directory:", os.getcwd())
-print("Python Path:", sys.path)
-print("Files in Current Directory:", os.listdir('.'))
-
-# Verifique se o parameters.py está acessível
-parameters_path = os.path.join(os.getcwd(), "parameters.py")
-if os.path.isfile(parameters_path):
-    print("parameters.py found")
-else:
-    print("parameters.py not found")
+# Adiciona o diretório raiz ao sys.path
+sys.path.append(str(Path(__file__).resolve().parent))
 
 import pandas as pd
 from datetime import datetime
