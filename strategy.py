@@ -8,6 +8,21 @@ from src.setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
 from src.setups.emas import buy_double_ema_breakout
 from parameters import short_period, long_period, ratio, stop_candles
 
+import sys
+import os
+
+print("Current Working Directory:", os.getcwd())
+print("Python Path:", sys.path)
+print("Files in Current Directory:", os.listdir('.'))
+
+# Verifique se o parameters.py está acessível
+parameters_path = os.path.join(os.getcwd(), "parameters.py")
+if os.path.isfile(parameters_path):
+    print("parameters.py found")
+else:
+    print("parameters.py not found")
+
+
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol, quantity, interval, setup):
         self.data_interface = data_interface
