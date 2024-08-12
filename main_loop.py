@@ -1,10 +1,11 @@
 import threading
 import time
-from config import API_KEY, API_SECRET, SYMBOL, QUANTITY, INTERVAL, SETUP
+from config import API_KEY, API_SECRET
 from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
+from parameters import ativo as SYMBOL, timeframe as INTERVAL, setup as SETUP
 
 def check_last_transaction(data_interface, symbol):
     try:
@@ -23,7 +24,7 @@ def main_loop():
     start_prometheus_server(8000)
     metrics = Metrics(SYMBOL)
     data_interface = LiveData(API_KEY, API_SECRET)
-    strategy = TradingStrategy(data_interface, metrics, SYMBOL, QUANTITY, INTERVAL, SETUP)
+    strategy = TradingStrategy(data_interface, metrics, SYMBOL, INTERVAL, SETUP)
 
     is_comprado_logged = False
     is_not_comprado_logged = False
@@ -61,13 +62,6 @@ def main_loop():
                 if current_time - last_log_time >= 120:
                     logger.info("Executando lógica de venda...")
                     last_log_time = current_time
-                # is_buy, trade_history = strategy.sell_logic(
-                #     trade_history['valor_compra'].iloc[-1],
-                #     trade_history,
-                #     trade_history['min_referencia'].iloc[-1],
-                #     trade_history['max_referencia'].iloc[-1],
-                #     current_time
-                # )
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
             else:
                 if current_time - last_log_time >= 120:
