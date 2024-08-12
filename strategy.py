@@ -149,7 +149,7 @@ class TradingStrategy:
                             })
                             trade_history = pd.concat([trade_history, new_row], ignore_index=True)
                             logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
-                            trade_history.to_csv('data/trade_history.csv', index=False)  # Salva no CSV apenas após uma compra
+                            trade_history.to_csv('data/trade_history.csv', index=False)
                             self.metrics.buy_prices.append(current_price)
                             self.metrics.update_metrics_on_buy(self.symbol, current_price, stoploss, stopgain, potential_loss, potential_gain)
                             self.position_maintained = False
