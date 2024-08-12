@@ -1,9 +1,3 @@
-import sys
-from pathlib import Path
-
-# Adiciona o diretório raiz ao sys.path
-sys.path.append(str(Path(__file__).resolve().parent))
-
 import pandas as pd
 from datetime import datetime
 from src.utils import logger, update_trade_history, safe_float_conversion, calculate_gain_percentage, calculate_loss_percentage
@@ -12,7 +6,7 @@ import time
 from src.setups.stopgain import sell_stopgain, set_sell_stopgain_ratio
 from src.setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
 from src.setups.emas import buy_double_ema_breakout
-from parameters import short_period, long_period, ratio, stop_candles
+from src.parameters import short_period, long_period, ratio, stop_candles
 
 
 

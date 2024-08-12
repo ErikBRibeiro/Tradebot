@@ -5,7 +5,7 @@ from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
-from parameters import ativo as SYMBOL, timeframe as INTERVAL, setup as SETUP
+from src.parameters import ativo as SYMBOL, timeframe as INTERVAL, setup as SETUP
 
 def check_last_transaction(data_interface, symbol):
     try:
