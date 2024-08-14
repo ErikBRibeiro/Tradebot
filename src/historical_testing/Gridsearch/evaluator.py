@@ -1,5 +1,5 @@
 class StrategyEvaluator:
-    def __init__(self, historical_data, strategies, performance_function):
+    def __init__(self, historical_data, strategies, performance_function, start_cursor):
         self.historical_data = historical_data
 
         # list of classes that operate on sequential candles and historical data
@@ -12,6 +12,7 @@ class StrategyEvaluator:
         self.performance_function = performance_function
 
         self.candles = historical_data.itertuples()
+        self.start_cursor = start_cursor
         self.cursor = 0
         self.results = None
 
@@ -29,8 +30,11 @@ class StrategyEvaluator:
         if self.is_done_evaluating():
             return
         self.cursor += 1
-
         candle = next(self.candles)
+
+        if self.start_cursor > self.cursor:
+            return
+
         for strategy in self.strategies:
             strategy.trade(candle, self.historical_data)
 
