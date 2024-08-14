@@ -9,12 +9,13 @@ from src.parameters import ativo as SYMBOL, timeframe as INTERVAL, setup as SETU
 
 def check_last_transaction(data_interface, symbol):
     try:
-        trades = data_interface.client.get_my_trades(symbol=symbol, limit=5)
+        # Alteração para usar o método de futuros
+        trades = data_interface.client.futures_account_trades(symbol=symbol, limit=5)
         if not trades:
             return False
         trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
         last_trade = trades_sorted[0]
-        is_buy = last_trade['isBuyer']
+        is_buy = last_trade['side'] == 'BUY'  # Verifica se foi uma compra
         return is_buy
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
@@ -23,7 +24,10 @@ def check_last_transaction(data_interface, symbol):
 def main_loop():
     start_prometheus_server(8000)
     metrics = Metrics(SYMBOL)
-    data_interface = LiveData(API_KEY, API_SECRET)
+    
+    # Modificação para inicializar a interface de dados com futuros
+    data_interface = LiveData(API_KEY, API_SECRET, futures=True)
+    
     strategy = TradingStrategy(data_interface, metrics, SYMBOL, INTERVAL, SETUP)
 
     is_comprado_logged = False
