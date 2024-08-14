@@ -62,7 +62,7 @@ class EvaluatedStrategy:
                 self.monthly_results[year][month]['perda_percentual_total'] += loss_percentage + self.trading_tax
                 self.balance -= self.balance * (loss_percentage + self.trading_tax) / 100
                 self.monthly_results[year][month]['saldo_final'] = self.balance
-                comprado = False
+                self.is_holding = False
 
                 self.current_trade['close_price'] = self.stoploss
                 self.current_trade['close_time'] = open_time
@@ -87,7 +87,7 @@ class EvaluatedStrategy:
                 self.monthly_results[year][month]['successful_trades'] += 1
                 self.balance += self.balance * ((profit - self.trading_tax) / 100)
                 self.monthly_results[year][month]['saldo_final'] = self.balance
-                comprado = False
+                self.is_holding = False
 
                 self.current_trade['close_price'] = self.stopgain
                 self.current_trade['close_time'] = open_time
@@ -102,7 +102,7 @@ class EvaluatedStrategy:
                     self.min_balance_since_max = self.balance
                 return
 
-        if not comprado:
+        if not self.is_holding:
             historical_data['ema_short'] = self.computed_short_period
             historical_data['ema_long'] = self.computed_long_period
             if emas.buy_double_ema_breakout(historical_data.iloc[idx - 5:idx], 'ema_short', 'ema_long'):
@@ -115,7 +115,7 @@ class EvaluatedStrategy:
                     self.balance -= self.balance * self.trading_tax / 100
                 self.monthly_results[year][month]['saldo_final'] = self.balance
                 stopgain = StopGain.set_sell_stopgain_ratio(buy_price, stoploss, self.ratio)
-                comprado = True
+                self.is_holding = True
 
                 self.current_trade = {
                     'open_time': open_time,
