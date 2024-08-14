@@ -5,7 +5,7 @@ from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
-from src.parameters import ativo as SYMBOL, timeframe as INTERVAL, setup as SETUP
+from src.parameters import ativo, timeframe, setup  # Importa variáveis de parameters.py
 
 def check_last_transaction(data_interface, symbol):
     try:
@@ -23,12 +23,12 @@ def check_last_transaction(data_interface, symbol):
 
 def main_loop():
     start_prometheus_server(8000)
-    metrics = Metrics(SYMBOL)
+    metrics = Metrics(ativo)  # Usa o ativo definido em parameters.py
     
     # Modificação para inicializar a interface de dados com futuros
     data_interface = LiveData(API_KEY, API_SECRET, futures=True)
     
-    strategy = TradingStrategy(data_interface, metrics, SYMBOL, INTERVAL, SETUP)
+    strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
     is_comprado_logged = False
     is_not_comprado_logged = False
@@ -38,7 +38,7 @@ def main_loop():
     last_log_time = time.time()  # Inicializa o temporizador de logs
 
     # Inicia a atualização contínua do preço em uma thread separada
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(SYMBOL, 20))
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 20))
     price_thread.daemon = True
     price_thread.start()
 
@@ -46,8 +46,8 @@ def main_loop():
         try:
             current_time = time.time()
 
-            is_buy = check_last_transaction(data_interface, SYMBOL)
-            metrics.loop_counter_metric.labels(SYMBOL).inc()
+            is_buy = check_last_transaction(data_interface, ativo)
+            metrics.loop_counter_metric.labels(ativo).inc()
 
             if is_buy and not is_comprado_logged:
                 if current_time - last_log_time >= 120:
