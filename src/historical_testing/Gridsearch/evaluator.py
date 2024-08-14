@@ -35,7 +35,7 @@ class StrategyEvaluator:
             return
 
         for strategy in self.strategies:
-            strategy.trade(candle, self.historical_data)
+            strategy.trade(self.cursor, candle, self.historical_data)
 
     def results(self):
         best_strategy = None
