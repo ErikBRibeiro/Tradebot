@@ -48,7 +48,7 @@ class EvaluatedStrategy:
         self.current_trade = None
         self.stop_gain = None
         self.stop_loss = None
-        self.buy_price
+        self.buy_price = None
 
     def trade(self, idx, candle, historical_data):
         open_time = candle.open_time
