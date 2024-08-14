@@ -20,7 +20,7 @@ class EvaluatedStrategy:
             lambda: {
                 'open_trades': 0,
                 'lucro': 0,
-                'succesful_trades': 0,
+                'successful_trades': 0,
                 'failed_trades': 0,
                 'perda_percentual_total': 0,
                 'saldo_inicial': starting_balance,
