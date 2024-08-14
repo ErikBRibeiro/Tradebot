@@ -6,10 +6,10 @@ import time
 from src.setups.stopgain import sell_stopgain, set_sell_stopgain_ratio
 from src.setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
 from src.setups.emas import buy_double_ema_breakout
-from src.parameters import short_period, long_period, ratio, stop_candles
+from src.parameters import short_period, long_period, ratio, stop_candles, ativo, timeframe, setup  # Importa variáveis de parameters.py
 
 class TradingStrategy:
-    def __init__(self, data_interface, metrics, symbol, interval, setup):
+    def __init__(self, data_interface, metrics, symbol=ativo, interval=timeframe, setup=setup):
         self.data_interface = data_interface
         self.metrics = metrics
         self.symbol = symbol
@@ -23,8 +23,8 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
-        data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])    
+        klines = self.data_interface.client.futures_klines(symbol=self.symbol, interval=self.interval, limit=150)
+        data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
         data['high'] = data['high'].apply(safe_float_conversion)
@@ -50,13 +50,13 @@ class TradingStrategy:
             if current_time - self.last_log_time >= 120:
                 logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
-            balance_btc = self.data_interface.get_current_balance('BTC')
+            balance_asset = self.data_interface.get_current_balance(self.symbol.replace('USDT', ''))
             lot_size = self.data_interface.get_lot_size(self.symbol)
-            if balance_btc > 0 and lot_size:
-                quantity_to_sell = (balance_btc // lot_size) * lot_size
+            if balance_asset > 0 and lot_size:
+                quantity_to_sell = (balance_asset // lot_size) * lot_size
                 if quantity_to_sell > 0:
                     quantity_to_sell = round(quantity_to_sell, 8)
-                    order = self.data_interface.create_order(self.symbol, 'sell', quantity_to_sell)
+                    order = self.data_interface.create_order(self.symbol, 'SELL', quantity_to_sell, 'MARKET')
                     if order is not None:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
@@ -77,7 +77,7 @@ class TradingStrategy:
                     return False, trade_history
             else:
                 if current_time - self.last_log_time >= 120:
-                    logger.info("Saldo de BTC insuficiente para venda.")
+                    logger.info("Saldo de ativo insuficiente para venda.")
                 self.position_maintained = False
                 return False, trade_history
 
@@ -91,7 +91,7 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
+        klines = self.data_interface.client.futures_klines(symbol=self.symbol, interval=self.interval, limit=150)
         data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
 
         data['close'] = data['close'].apply(safe_float_conversion)
@@ -114,7 +114,7 @@ class TradingStrategy:
             # Obtém o saldo disponível em USDT
             balance_usdt = self.data_interface.get_current_balance('USDT')
             if balance_usdt > 0:
-                # Calcula a quantidade de BTC a ser comprada com todo o saldo USDT disponível
+                # Calcula a quantidade de ativo a ser comprado com todo o saldo USDT disponível
                 quantity_to_buy = balance_usdt / current_price
 
                 # Ajusta a quantidade para o tamanho do lote
@@ -124,7 +124,7 @@ class TradingStrategy:
                     quantity_to_buy = round(quantity_to_buy, 8)  # Arredonda para 8 casas decimais
 
                     if quantity_to_buy > 0:
-                        order = self.data_interface.create_order(self.symbol, 'buy', quantity_to_buy)
+                        order = self.data_interface.create_order(self.symbol, 'BUY', quantity_to_buy, 'MARKET')
                         if order is not None:
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
                             stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
