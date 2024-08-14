@@ -64,7 +64,7 @@ class EvaluatedStrategy:
                 self.monthly_results[year][month]['saldo_final'] = self.balance
                 self.is_holding = False
 
-                self.current_trade['close_price'] = self.stoploss
+                self.current_trade['close_price'] = self.stop_loss
                 self.current_trade['close_time'] = open_time
                 self.current_trade['outcome'] = loss_percentage
                 self.current_trade['result'] = 'StopLoss'
@@ -81,15 +81,15 @@ class EvaluatedStrategy:
                 self.monthly_results[year][month]['max_drawdown'] = self.max_drawdown
                 return
 
-            elif StopGain.sell_stopgain(candle.high, self.stopgain):
-                profit = utils.calculate_gain_percentage(self.buy_price, self.stopgain)
+            elif StopGain.sell_stopgain(candle.high, self.stop_gain):
+                profit = utils.calculate_gain_percentage(self.buy_price, self.stop_gain)
                 self.monthly_results[year][month]['lucro'] += profit - self.trading_tax
                 self.monthly_results[year][month]['successful_trades'] += 1
                 self.balance += self.balance * ((profit - self.trading_tax) / 100)
                 self.monthly_results[year][month]['saldo_final'] = self.balance
                 self.is_holding = False
 
-                self.current_trade['close_price'] = self.stopgain
+                self.current_trade['close_price'] = self.stop_gain
                 self.current_trade['close_time'] = open_time
                 self.current_trade['outcome'] = profit
                 self.current_trade['result'] = 'StopGain'
@@ -107,21 +107,21 @@ class EvaluatedStrategy:
             historical_data['ema_long'] = self.computed_long_period
             if emas.buy_double_ema_breakout(historical_data.iloc[idx - 5:idx], 'ema_short', 'ema_long'):
                 self.monthly_results[year][month]['open_trades'] += 1
-                buy_price = historical_data['high'].iat[idx - 2]
-                stoploss = StopLoss.set_sell_stoploss_min_candles(
+                self.buy_price = historical_data['high'].iat[idx - 2]
+                self.stop_loss = StopLoss.set_sell_stoploss_min_candles(
                     historical_data.iloc[idx - (self.stop_candles + 1):idx],
                     self.stop_candles)
                 if self.trading_tax != 0:
                     self.balance -= self.balance * self.trading_tax / 100
                 self.monthly_results[year][month]['saldo_final'] = self.balance
-                stopgain = StopGain.set_sell_stopgain_ratio(buy_price, stoploss, self.ratio)
+                self.stop_gain = StopGain.set_sell_stopgain_ratio(self.buy_price, self.stop_loss, self.ratio)
                 self.is_holding = True
 
                 self.current_trade = {
                     'open_time': open_time,
-                    'buy_price': buy_price,
-                    'stoploss': stoploss,
-                    'stopgain': stopgain,
+                    'buy_price': self.buy_price,
+                    'stoploss': self.stop_loss,
+                    'stopgain': self.stop_gain,
                     'close_price': 0,
                     'close_time': 0,
                     'outcome': 0,
