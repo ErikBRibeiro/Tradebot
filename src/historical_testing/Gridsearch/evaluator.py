@@ -49,7 +49,7 @@ class StrategyEvaluator:
         best_strategy_summary = {
             "identifier": best_strategy.identifier,
             "performance": self.performance_of(best_strategy),
-            "metrics": best_strategy.metrics
+            "metrics": best_strategy.metrics()
         }
 
         return best_strategy_summary
