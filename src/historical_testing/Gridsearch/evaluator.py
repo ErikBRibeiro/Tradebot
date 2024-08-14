@@ -14,7 +14,6 @@ class StrategyEvaluator:
         self.candles = historical_data.itertuples()
         self.start_cursor = start_cursor
         self.cursor = 0
-        self.results = None
 
     def is_done_evaluating(self):
         return (self.cursor >= len(self.historical_data)
