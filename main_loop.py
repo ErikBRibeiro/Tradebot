@@ -7,6 +7,9 @@ from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
 from src.parameters import ativo, timeframe, setup  # Importa variáveis de parameters.py
 
+from binance.exceptions import BinanceAPIException
+from requests.exceptions import ConnectionError, Timeout
+
 def check_last_transaction(data_interface, symbol):
     try:
         logger.info(f"Verificando última transação para {symbol} (Futuros)")
@@ -22,12 +25,13 @@ def check_last_transaction(data_interface, symbol):
         last_trade = trades_sorted[0]
         is_buy = last_trade['side'] == 'BUY'  # Verifica se foi uma compra
         return is_buy
-    except exceptions.BinanceAPIException as e:
+    except BinanceAPIException as e:
         logger.error(f"Erro na API Binance ao verificar a última transação: {e}")
         return False
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
         return False
+
 
 def main_loop():
     start_prometheus_server(8000)
