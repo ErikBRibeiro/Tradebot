@@ -35,9 +35,8 @@ def check_last_transaction(data_interface, symbol):
 
 def main_loop():
     start_prometheus_server(8000)
-    metrics = Metrics(ativo)  # Usa o ativo definido em parameters.py
+    metrics = Metrics(ativo)  
     
-    # Inicializa a interface de dados com futuros
     data_interface = LiveData(API_KEY, API_SECRET, futures=True)
     
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
@@ -47,10 +46,10 @@ def main_loop():
     is_buy = False
     trade_history = read_trade_history()
 
-    last_log_time = time.time()  # Inicializa o temporizador de logs
+    last_log_time = time.time() 
 
-    # Inicia a atualização contínua do preço em uma thread separada com uma frequência reduzida
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 0.5))  # Reduz a frequência para 0.5 requisições por segundo
+    # Reduza a frequência para uma requisição a cada 5 segundos
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 0.2))  
     price_thread.daemon = True
     price_thread.start()
 
@@ -58,7 +57,8 @@ def main_loop():
         try:
             current_time = time.time()
 
-            is_buy = check_last_transaction(data_interface, ativo)
+            # Comente temporariamente a verificação de transações para isolar o problema
+            # is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
 
             if is_buy and not is_comprado_logged:
