@@ -38,7 +38,7 @@ def main_loop():
     last_log_time = time.time()  # Inicializa o temporizador de logs
 
     # Inicia a atualização contínua do preço em uma thread separada
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 20))
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 5))
     price_thread.daemon = True
     price_thread.start()
 
