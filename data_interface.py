@@ -3,7 +3,7 @@ import pandas as pd
 from binance.client import Client
 from binance import exceptions
 from requests.exceptions import ConnectionError, Timeout
-
+from src.parameters import short_period, long_period
 from src.utils import logger, safe_float_conversion
 
 class LiveData:
@@ -29,8 +29,10 @@ class LiveData:
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
             data['volume'] = data['volume'].apply(safe_float_conversion)
-            data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
-            data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
+            
+            # Substituindo os valores fixos de EMA pelos valores definidos em parameters.py
+            data[f'EMA_{short_period}'] = data['close'].ewm(span=short_period, adjust=False).mean()
+            data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
                 logger.error("Dados corrompidos recebidos da API Binance.")
