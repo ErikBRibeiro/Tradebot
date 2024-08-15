@@ -121,7 +121,7 @@ class LiveData:
             logger.error(f"Erro inesperado ao criar ordem: {e}")
             return None
 
-    def update_price_continuously(self, symbol, frequency_per_second=20):
+    def update_price_continuously(self, symbol, frequency_per_second=10):
         interval = 1 / frequency_per_second
         while True:
             try:
