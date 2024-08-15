@@ -38,7 +38,7 @@ def main_loop():
     metrics = Metrics(ativo)  
     
     data_interface = LiveData(API_KEY, API_SECRET, futures=True)
-    
+    logger.info(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
     is_comprado_logged = False
