@@ -9,14 +9,22 @@ from src.parameters import ativo, timeframe, setup  # Importa variáveis de para
 
 def check_last_transaction(data_interface, symbol):
     try:
-        # Usando a URL correta para futuros
+        logger.info(f"Verificando última transação para {symbol} (Futuros)")
+        
+        # Verifique se há histórico de transações
         trades = data_interface.client.futures_account_trades(symbol=symbol, limit=5)
-        if not trades:
+        
+        if not trades or len(trades) == 0:
+            logger.info("Nenhuma transação encontrada. Pode ser que não haja histórico de transações para este símbolo.")
             return False
+
         trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
         last_trade = trades_sorted[0]
         is_buy = last_trade['side'] == 'BUY'  # Verifica se foi uma compra
         return is_buy
+    except exceptions.BinanceAPIException as e:
+        logger.error(f"Erro na API Binance ao verificar a última transação: {e}")
+        return False
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
         return False
