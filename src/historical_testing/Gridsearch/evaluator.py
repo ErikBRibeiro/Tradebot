@@ -16,7 +16,7 @@ class StrategyEvaluator:
         self.cursor = 0
 
     def is_done_evaluating(self):
-        return (self.cursor >= len(self.historical_data)
+        return (self.cursor >= len(self.historical_data) - 1
                 or len(self.strategies) == 0)
 
     def current_progress(self):
