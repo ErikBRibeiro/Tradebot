@@ -19,8 +19,10 @@ class LiveData:
     def get_historical_data(self, symbol, interval, limit=150):
         try:
             if self.futures:
+                logger.info(f"Requisitando dados históricos para {symbol} (Futuros) com intervalo {interval}")
                 klines = self.client.futures_klines(symbol=symbol, interval=interval, limit=limit)
             else:
+                logger.info(f"Requisitando dados históricos para {symbol} com intervalo {interval}")
                 klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
 
             data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
@@ -53,9 +55,12 @@ class LiveData:
     def get_current_price(self, symbol):
         try:
             if self.futures:
+                logger.info(f"Requisitando preço atual para {symbol} (Futuros)")
                 ticker = float(self.client.futures_symbol_ticker(symbol=symbol)['price'])
             else:
+                logger.info(f"Requisitando preço atual para {symbol}")
                 ticker = float(self.client.get_symbol_ticker(symbol=symbol)['price'])
+            logger.info(f"Preço atual para {symbol}: {ticker}")
             return ticker
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro na API Binance ao obter preço atual: {e}")
@@ -67,13 +72,19 @@ class LiveData:
     def get_current_balance(self, asset):
         try:
             if self.futures:
+                logger.info(f"Requisitando saldo para {asset} (Futuros)")
                 balance_info = self.client.futures_account_balance()
                 for balance in balance_info:
                     if balance['asset'] == asset:
-                        return float(balance['balance'])
+                        balance_value = float(balance['balance'])
+                        logger.info(f"Saldo disponível para {asset}: {balance_value}")
+                        return balance_value
             else:
+                logger.info(f"Requisitando saldo para {asset}")
                 balance_info = self.client.get_asset_balance(asset=asset)
-                return float(balance_info['free'])
+                balance_value = float(balance_info['free'])
+                logger.info(f"Saldo disponível para {asset}: {balance_value}")
+                return balance_value
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro na API Binance ao obter saldo: {e}")
             return 0.0
@@ -83,10 +94,14 @@ class LiveData:
 
     def get_lot_size(self, symbol):
         try:
+            logger.info(f"Requisitando LOT_SIZE para {symbol}")
             info = self.client.get_symbol_info(symbol)
             for f in info['filters']:
                 if f['filterType'] == 'LOT_SIZE':
-                    return float(f['stepSize'])
+                    lot_size = float(f['stepSize'])
+                    logger.info(f"LOT_SIZE para {symbol}: {lot_size}")
+                    return lot_size
+            logger.warning(f"LOT_SIZE não encontrado para {symbol}")
             return None
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro na API Binance ao obter LOT_SIZE: {e}")
@@ -97,6 +112,7 @@ class LiveData:
 
     def create_order(self, symbol, side, quantity):
         try:
+            logger.info(f"Criando ordem: {side} {quantity} de {symbol}")
             if self.futures:
                 if side.lower() == 'buy':
                     order = self.client.futures_create_order(symbol=symbol, side='BUY', type='MARKET', quantity=quantity)
@@ -113,6 +129,7 @@ class LiveData:
                 else:
                     logger.error(f"Tipo de ordem não reconhecido: {side}")
                     return None
+            logger.info(f"Ordem criada com sucesso: {order}")
             return order
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro ao criar ordem na Binance: {e}")
@@ -125,6 +142,7 @@ class LiveData:
         interval = 1 / frequency_per_second
         while True:
             try:
+                logger.info(f"Atualizando preço continuamente para {symbol}")
                 self.current_price = self.get_current_price(symbol)
             except Exception as e:
                 logger.error(f"Erro ao atualizar o preço continuamente: {e}")

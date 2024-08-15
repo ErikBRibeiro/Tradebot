@@ -9,7 +9,7 @@ from src.parameters import ativo, timeframe, setup  # Importa variáveis de para
 
 def check_last_transaction(data_interface, symbol):
     try:
-        # Alteração para usar o método de futuros
+        # Usando a URL correta para futuros
         trades = data_interface.client.futures_account_trades(symbol=symbol, limit=5)
         if not trades:
             return False
@@ -25,7 +25,7 @@ def main_loop():
     start_prometheus_server(8000)
     metrics = Metrics(ativo)  # Usa o ativo definido em parameters.py
     
-    # Modificação para inicializar a interface de dados com futuros
+    # Inicializa a interface de dados com futuros
     data_interface = LiveData(API_KEY, API_SECRET, futures=True)
     
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
@@ -37,8 +37,8 @@ def main_loop():
 
     last_log_time = time.time()  # Inicializa o temporizador de logs
 
-    # Inicia a atualização contínua do preço em uma thread separada
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 0.2))
+    # Inicia a atualização contínua do preço em uma thread separada com uma frequência reduzida
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 0.5))  # Reduz a frequência para 0.5 requisições por segundo
     price_thread.daemon = True
     price_thread.start()
 
