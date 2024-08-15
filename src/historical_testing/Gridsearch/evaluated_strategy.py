@@ -22,7 +22,7 @@ class EvaluatedStrategy:
                 'successful_trades': 0,
                 'failed_trades': 0,
                 'perda_percentual_total': 0,
-                'saldo_inicial': starting_balance,
+                'saldo_inicial': None,
                 'saldo_final': starting_balance,
                 'max_drawdown': 0
             }
@@ -53,6 +53,9 @@ class EvaluatedStrategy:
         open_time = candle.open_time
         year = open_time.year
         month = open_time.month
+
+        if self.monthly_results[year][month]['saldo_inicial'] is None:
+            self.monthly_results[year][month]['saldo_inicial'] = self.balance
 
         if self.is_holding:
             if StopLoss.sell_stoploss(candle.low, self.stop_loss):
