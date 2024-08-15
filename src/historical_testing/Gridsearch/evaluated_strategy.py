@@ -115,11 +115,11 @@ class EvaluatedStrategy:
                 return
 
             if not (previous_candle.close
-                    > historical_data[self.long_ema_column].iat[idx-2]):
+                    > getattr(previous_candle, self.long_ema_column)):
                 return
 
             if not (previous_candle.close
-                    > historical_data[self.short_ema_column].iat[idx-2]):
+                    > getattr(previous_candle, self.short_ema_column)):
                 return
 
             self.monthly_results[year][month]['open_trades'] += 1
