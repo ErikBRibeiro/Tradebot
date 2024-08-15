@@ -28,13 +28,18 @@ class EvaluatedStrategy:
             }
         ))
 
-        self.computed_short_period = historical_data['close'].ewm(
-            span=short_period, adjust=False
-            ).mean()
+        self.short_ema_column = f"ema_{short_period}"
+        self.long_ema_column = f"ema_{long_period}"
 
-        self.computed_long_period = historical_data['close'].ewm(
-            span=long_period, adjust=False
-            ).mean()
+        if self.short_ema_column not in historical_data:
+            historical_data[self.short_ema_column] = historical_data['close'].ewm(
+                span=short_period, adjust=False
+                ).mean()
+
+        if self.long_ema_column not in historical_data:
+            historical_data[self.long_ema_column] = historical_data['close'].ewm(
+                span=long_period, adjust=False
+                ).mean()
 
         self.max_balance = starting_balance
         self.min_balance_since_max = starting_balance
@@ -109,12 +114,12 @@ class EvaluatedStrategy:
             if not candle.high > previous_candle.high:
                 return
 
-            historical_data['ema_long'] = self.computed_long_period
-            if not previous_candle.close > historical_data['ema_long'].iat[idx-2]:
+            if not (previous_candle.close
+                    > historical_data[self.long_ema_column].iat[idx-2]):
                 return
 
-            historical_data['ema_short'] = self.computed_short_period
-            if not previous_candle.close > historical_data['ema_short'].iat[idx-2]:
+            if not (previous_candle.close
+                    > historical_data[self.short_ema_column].iat[idx-2]):
                 return
 
             self.monthly_results[year][month]['open_trades'] += 1
