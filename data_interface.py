@@ -7,13 +7,22 @@ from requests.exceptions import ConnectionError, Timeout
 from src.utils import logger, safe_float_conversion
 
 class LiveData:
-    def __init__(self, api_key, api_secret):
-        self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
+    def __init__(self, api_key, api_secret, futures=False):
+        self.futures = futures
+        if self.futures:
+            self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
+            self.client.FUTURES_URL = 'https://fapi.binance.com'  # URL da API de Futuros
+        else:
+            self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
         self.current_price = None
 
     def get_historical_data(self, symbol, interval, limit=150):
         try:
-            klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            if self.futures:
+                klines = self.client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+            else:
+                klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+
             data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
@@ -41,7 +50,10 @@ class LiveData:
 
     def get_current_price(self, symbol):
         try:
-            ticker = float(self.client.get_symbol_ticker(symbol=symbol)['price'])
+            if self.futures:
+                ticker = float(self.client.futures_symbol_ticker(symbol=symbol)['price'])
+            else:
+                ticker = float(self.client.get_symbol_ticker(symbol=symbol)['price'])
             return ticker
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro na API Binance ao obter preço atual: {e}")
@@ -52,8 +64,14 @@ class LiveData:
 
     def get_current_balance(self, asset):
         try:
-            balance_info = self.client.get_asset_balance(asset=asset)
-            return float(balance_info['free'])
+            if self.futures:
+                balance_info = self.client.futures_account_balance()
+                for balance in balance_info:
+                    if balance['asset'] == asset:
+                        return float(balance['balance'])
+            else:
+                balance_info = self.client.get_asset_balance(asset=asset)
+                return float(balance_info['free'])
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro na API Binance ao obter saldo: {e}")
             return 0.0
@@ -77,13 +95,22 @@ class LiveData:
 
     def create_order(self, symbol, side, quantity):
         try:
-            if side.lower() == 'buy':
-                order = self.client.order_market_buy(symbol=symbol, quantity=quantity)
-            elif side.lower() == 'sell':
-                order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+            if self.futures:
+                if side.lower() == 'buy':
+                    order = self.client.futures_create_order(symbol=symbol, side='BUY', type='MARKET', quantity=quantity)
+                elif side.lower() == 'sell':
+                    order = self.client.futures_create_order(symbol=symbol, side='SELL', type='MARKET', quantity=quantity)
+                else:
+                    logger.error(f"Tipo de ordem não reconhecido: {side}")
+                    return None
             else:
-                logger.error(f"Tipo de ordem não reconhecido: {side}")
-                return None
+                if side.lower() == 'buy':
+                    order = self.client.order_market_buy(symbol=symbol, quantity=quantity)
+                elif side.lower() == 'sell':
+                    order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+                else:
+                    logger.error(f"Tipo de ordem não reconhecido: {side}")
+                    return None
             return order
         except exceptions.BinanceAPIException as e:
             logger.error(f"Erro ao criar ordem na Binance: {e}")
