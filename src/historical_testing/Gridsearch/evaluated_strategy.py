@@ -139,7 +139,6 @@ class EvaluatedStrategy:
                 'result': ''
             }
             return
-        pass
 
     def current_balance(self):
         return self.balance
