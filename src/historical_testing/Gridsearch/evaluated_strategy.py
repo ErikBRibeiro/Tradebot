@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 import utils
-import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
@@ -50,7 +49,7 @@ class EvaluatedStrategy:
         self.stop_loss = None
         self.buy_price = None
 
-    def trade(self, idx, candle, historical_data):
+    def trade(self, idx, candle, previous_candle, historical_data):
         open_time = candle.open_time
         year = open_time.year
         month = open_time.month
@@ -103,31 +102,40 @@ class EvaluatedStrategy:
                 return
 
         if not self.is_holding:
-            historical_data['ema_short'] = self.computed_short_period
-            historical_data['ema_long'] = self.computed_long_period
-            if emas.buy_double_ema_breakout(historical_data.iloc[idx - 5:idx], 'ema_short', 'ema_long'):
-                self.monthly_results[year][month]['open_trades'] += 1
-                self.buy_price = historical_data['high'].iat[idx - 2]
-                self.stop_loss = StopLoss.set_sell_stoploss_min_candles(
-                    historical_data.iloc[idx - (self.stop_candles + 1):idx],
-                    self.stop_candles)
-                if self.trading_tax != 0:
-                    self.balance -= self.balance * self.trading_tax / 100
-                self.monthly_results[year][month]['saldo_final'] = self.balance
-                self.stop_gain = StopGain.set_sell_stopgain_ratio(self.buy_price, self.stop_loss, self.ratio)
-                self.is_holding = True
-
-                self.current_trade = {
-                    'open_time': open_time,
-                    'buy_price': self.buy_price,
-                    'stoploss': self.stop_loss,
-                    'stopgain': self.stop_gain,
-                    'close_price': 0,
-                    'close_time': 0,
-                    'outcome': 0,
-                    'result': ''
-                }
+            # same logic as buy_double_ema_breakout but optimized
+            if not candle.high > previous_candle.high:
                 return
+
+            historical_data['ema_long'] = self.computed_long_period
+            if not previous_candle.close > historical_data['ema_long'].iat[idx-2]:
+                return
+
+            historical_data['ema_short'] = self.computed_short_period
+            if not previous_candle.close > historical_data['ema_short'].iat[idx-2]:
+                return
+
+            self.monthly_results[year][month]['open_trades'] += 1
+            self.buy_price = previous_candle.high
+            self.stop_loss = StopLoss.set_sell_stoploss_min_candles(
+                historical_data.iloc[idx - (self.stop_candles + 1):idx],
+                self.stop_candles)
+            if self.trading_tax != 0:
+                self.balance -= self.balance * self.trading_tax / 100
+            self.monthly_results[year][month]['saldo_final'] = self.balance
+            self.stop_gain = StopGain.set_sell_stopgain_ratio(self.buy_price, self.stop_loss, self.ratio)
+            self.is_holding = True
+
+            self.current_trade = {
+                'open_time': open_time,
+                'buy_price': self.buy_price,
+                'stoploss': self.stop_loss,
+                'stopgain': self.stop_gain,
+                'close_price': 0,
+                'close_time': 0,
+                'outcome': 0,
+                'result': ''
+            }
+            return
         pass
 
     def current_balance(self):

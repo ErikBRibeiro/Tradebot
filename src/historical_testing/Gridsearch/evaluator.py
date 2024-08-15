@@ -12,6 +12,7 @@ class StrategyEvaluator:
         self.performance_function = performance_function
 
         self.candles = historical_data.itertuples()
+        self.previous_candle = None
         self.start_cursor = start_cursor
         self.cursor = 0
 
@@ -32,10 +33,12 @@ class StrategyEvaluator:
         candle = next(self.candles)
 
         if self.start_cursor > self.cursor:
+            self.previous_candle = candle
             return
 
         for strategy in self.strategies:
-            strategy.trade(self.cursor, candle, self.historical_data)
+            strategy.trade(self.cursor, candle, self.previous_candle, self.historical_data)
+        self.previous_candle = candle
 
     def results(self):
         best_strategy = None
