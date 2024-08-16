@@ -12,10 +12,10 @@ from requests.exceptions import ConnectionError, Timeout
 
 def check_last_transaction(data_interface, symbol):
     try:
-        logger.info(f"Verificando última transação para {symbol} (Futuros)")
+        logger.info(f"Verificando última transação para {symbol} (Spot)")
         
         # Verifique se há histórico de transações
-        trades = data_interface.client.futures_account_trades(symbol=symbol, limit=5)
+        trades = data_interface.client.get_my_trades(symbol=symbol, limit=5)
         
         if not trades or len(trades) == 0:
             logger.info("Nenhuma transação encontrada. Pode ser que não haja histórico de transações para este símbolo.")
@@ -23,7 +23,7 @@ def check_last_transaction(data_interface, symbol):
 
         trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
         last_trade = trades_sorted[0]
-        is_buy = last_trade['side'] == 'BUY'  # Verifica se foi uma compra
+        is_buy = last_trade['isBuyer']  # Verifica se foi uma compra
         return is_buy
     except BinanceAPIException as e:
         logger.error(f"Erro na API Binance ao verificar a última transação: {e}")
@@ -37,7 +37,7 @@ def main_loop():
     start_prometheus_server(8000)
     metrics = Metrics(ativo)  
     
-    data_interface = LiveData(API_KEY, API_SECRET, futures=True)
+    data_interface = LiveData(API_KEY, API_SECRET, futures=False)  # Altere para Spot
     logger.info(API_KEY)
     logger.info(API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
@@ -58,8 +58,8 @@ def main_loop():
         try:
             current_time = time.time()
 
-            # Comente temporariamente a verificação de transações para isolar o problema
-            # is_buy = check_last_transaction(data_interface, ativo)
+            # Ativar novamente a verificação de transações para Spot
+            is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
 
             if is_buy and not is_comprado_logged:

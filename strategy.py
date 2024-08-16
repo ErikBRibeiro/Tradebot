@@ -23,7 +23,7 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.futures_klines(symbol=self.symbol, interval=self.interval, limit=150)
+        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
         data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
@@ -56,7 +56,7 @@ class TradingStrategy:
                 quantity_to_sell = (balance_asset // lot_size) * lot_size
                 if quantity_to_sell > 0:
                     quantity_to_sell = round(quantity_to_sell, 8)
-                    order = self.data_interface.create_order(self.symbol, 'SELL', quantity_to_sell, 'MARKET')
+                    order = self.data_interface.create_order(self.symbol, 'SELL', quantity_to_sell)
                     if order is not None:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
@@ -91,7 +91,7 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.futures_klines(symbol=self.symbol, interval=self.interval, limit=150)
+        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
         data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
 
         data['close'] = data['close'].apply(safe_float_conversion)
@@ -124,7 +124,7 @@ class TradingStrategy:
                     quantity_to_buy = round(quantity_to_buy, 8)  # Arredonda para 8 casas decimais
 
                     if quantity_to_buy > 0:
-                        order = self.data_interface.create_order(self.symbol, 'BUY', quantity_to_buy, 'MARKET')
+                        order = self.data_interface.create_order(self.symbol, 'BUY', quantity_to_buy)
                         if order is not None:
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
                             stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
