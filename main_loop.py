@@ -37,7 +37,8 @@ def main_loop():
     start_prometheus_server(8000)
     metrics = Metrics(ativo)  
     
-    data_interface = LiveData(API_KEY, API_SECRET, futures=False)  # Altere para Spot
+    # Remova o argumento 'futures' ao instanciar LiveData
+    data_interface = LiveData(API_KEY, API_SECRET)  
     logger.info(API_KEY)
     logger.info(API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
