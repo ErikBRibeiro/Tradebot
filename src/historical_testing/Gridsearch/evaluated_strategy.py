@@ -62,53 +62,6 @@ class EvaluatedStrategy:
         if self.monthly_results[year][month]['saldo_inicial'] is None:
             self.monthly_results[year][month]['saldo_inicial'] = self.balance
 
-        if self.is_holding:
-            if StopLoss.sell_stoploss(candle.low, self.stop_loss):
-                loss_percentage = utils.calculate_loss_percentage(self.buy_price, self.stop_loss)
-                self.monthly_results[year][month]['failed_trades'] += 1
-                self.monthly_results[year][month]['perda_percentual_total'] += loss_percentage + self.trading_tax
-                self.balance -= self.balance * (loss_percentage + self.trading_tax) / 100
-                self.monthly_results[year][month]['saldo_final'] = self.balance
-                self.is_holding = False
-
-                self.current_trade['close_price'] = self.stop_loss
-                self.current_trade['close_time'] = open_time
-                self.current_trade['outcome'] = loss_percentage
-                self.current_trade['result'] = 'StopLoss'
-                self.trades.append(self.current_trade)
-                self.losses.append(-(loss_percentage + self.trading_tax))
-
-                if self.balance < self.min_balance_since_max:
-                    self.min_balance_since_max = self.balance
-                drawdown = (self.max_balance - self.min_balance_since_max) / self.max_balance * 100
-
-                if drawdown > self.max_drawdown:
-                    self.max_drawdown = drawdown
-
-                self.monthly_results[year][month]['max_drawdown'] = self.max_drawdown
-                return
-
-            elif StopGain.sell_stopgain(candle.high, self.stop_gain):
-                profit = utils.calculate_gain_percentage(self.buy_price, self.stop_gain)
-                self.monthly_results[year][month]['lucro'] += profit - self.trading_tax
-                self.monthly_results[year][month]['successful_trades'] += 1
-                self.balance += self.balance * ((profit - self.trading_tax) / 100)
-                self.monthly_results[year][month]['saldo_final'] = self.balance
-                self.is_holding = False
-
-                self.current_trade['close_price'] = self.stop_gain
-                self.current_trade['close_time'] = open_time
-                self.current_trade['outcome'] = profit
-                self.current_trade['result'] = 'StopGain'
-                self.trades.append(self.current_trade)
-
-                self.gains.append(profit - self.trading_tax)
-
-                if self.balance > self.max_balance:
-                    self.max_balance = self.balance
-                    self.min_balance_since_max = self.balance
-                return
-
         if not self.is_holding:
             # same logic as buy_double_ema_breakout but optimized
             if not candle.high > previous_candle.high:
@@ -144,6 +97,50 @@ class EvaluatedStrategy:
                 'result': ''
             }
             return
+
+        if StopLoss.sell_stoploss(candle.low, self.stop_loss):
+            loss_percentage = utils.calculate_loss_percentage(self.buy_price, self.stop_loss)
+            self.monthly_results[year][month]['failed_trades'] += 1
+            self.monthly_results[year][month]['perda_percentual_total'] += loss_percentage + self.trading_tax
+            self.balance -= self.balance * (loss_percentage + self.trading_tax) / 100
+            self.monthly_results[year][month]['saldo_final'] = self.balance
+            self.is_holding = False
+
+            self.current_trade['close_price'] = self.stop_loss
+            self.current_trade['close_time'] = open_time
+            self.current_trade['outcome'] = loss_percentage
+            self.current_trade['result'] = 'StopLoss'
+            self.trades.append(self.current_trade)
+            self.losses.append(-(loss_percentage + self.trading_tax))
+
+            if self.balance < self.min_balance_since_max:
+                self.min_balance_since_max = self.balance
+            drawdown = (self.max_balance - self.min_balance_since_max) / self.max_balance * 100
+
+            if drawdown > self.max_drawdown:
+                self.max_drawdown = drawdown
+
+            self.monthly_results[year][month]['max_drawdown'] = self.max_drawdown
+
+        elif StopGain.sell_stopgain(candle.high, self.stop_gain):
+            profit = utils.calculate_gain_percentage(self.buy_price, self.stop_gain)
+            self.monthly_results[year][month]['lucro'] += profit - self.trading_tax
+            self.monthly_results[year][month]['successful_trades'] += 1
+            self.balance += self.balance * ((profit - self.trading_tax) / 100)
+            self.monthly_results[year][month]['saldo_final'] = self.balance
+            self.is_holding = False
+
+            self.current_trade['close_price'] = self.stop_gain
+            self.current_trade['close_time'] = open_time
+            self.current_trade['outcome'] = profit
+            self.current_trade['result'] = 'StopGain'
+            self.trades.append(self.current_trade)
+
+            self.gains.append(profit - self.trading_tax)
+
+            if self.balance > self.max_balance:
+                self.max_balance = self.balance
+                self.min_balance_since_max = self.balance
 
     def current_balance(self):
         return self.balance
