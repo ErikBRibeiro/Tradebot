@@ -46,6 +46,12 @@ def calculate_gain_percentage(buy_price, target_price):
 def calculate_loss_percentage(buy_price, stop_loss):
     return (buy_price - stop_loss) / buy_price * 100
 
+def calculate_sell_gain_percentage(sell_price, target_price):
+    return (sell_price - target_price) / sell_price * 100
+
+def calculate_sell_loss_percentage(sell_price, stop_loss):
+    return (stop_loss - sell_price) / sell_price * 100
+
 # verifica se o candle em questão está em um dia útil
 def is_weekday(data):
     return datetime.fromtimestamp(data['open_time'] / 1000).weekday() < 5
