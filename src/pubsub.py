@@ -28,7 +28,8 @@ class Subscriber(ABC): # pylint: disable=too-few-public-methods
     Publisher notifies an attached Subscriber about a new event.
     """
     @abstractmethod
-    def update(self, event: str, data: object) -> None:
+    def update(self, identifier: str,
+               event: str, data: object) -> None:
         """Act upon a new event published by a subscribed Publisher.
 
         This method is called everytime a publisher which this subscriber is
@@ -37,6 +38,7 @@ class Subscriber(ABC): # pylint: disable=too-few-public-methods
         typecheck the data associated as well as react to different events.
 
         Args:
+          identifier: A string identifying the publisher of the event.
           event: A string describing the event.
           data:
             An object with extra data about the associated event. May be None.
@@ -53,10 +55,20 @@ class Publisher:
     themselves by calling the publisher's unsubscribe method.
 
     Attributes:
+      identifier:
+        A string identifying the publisher, useful for when you want a
+        subscriber to be able to handle many instances of the same
+        publisher, or separate publishers of different classes.
+        It is recommended for code utilising the Publisher class to identify
+        itself as its class and specific instance, but this is not enforced.
       subscribers: A list of all Subscribers currently listening for events.
     """
     _subscribers: list[Subscriber]
-    def __init__(self, subscribers: Optional[list[Subscriber]] = None):
+    _identifier: str
+
+    def __init__(self, identifier: str,
+                 subscribers: Optional[list[Subscriber]] = None):
+        self._identifier = identifier
         self._subscribers = subscribers if subscribers else []
 
     def subscribe(self, subscriber: Subscriber) -> None:
@@ -91,8 +103,8 @@ class Publisher:
         """Notifies all subscribers about an event, with accompanying data.
 
         Calls all subscribers in the publisher's subscription list with their
-        update method, passing in an event and associated data, which may be
-        any object.
+        update method, passing in the publisher's identifier, an event for the
+        subscriber to match on, and associated data, which may be any object.
 
         Args:
           event:
@@ -104,7 +116,7 @@ class Publisher:
             An object containing data about the event, which may be None.
         """
         for subscriber in self.subscribers:
-            subscriber.update(event, data)
+            subscriber.update(self._identifier, event, data)
 
     @property
     def subscribers(self) -> list[Subscriber]:
@@ -117,3 +129,20 @@ class Publisher:
           and unsubscribe methods.
         """
         return self._subscribers
+
+    @property
+    def identifier(self) -> str:
+        """Identifies the publisher to subscribers when notifying events.
+
+        This property is used for publishers to match on specific classes or
+        instances of a publisher, such that it is possible to track more than
+        one instance of publisher without relying on unique events.
+
+        It is only forced that this property is set, but there isn't any
+        validation done that it is unique or even that it is non-empty, such
+        validations should be done in client code.
+
+        Returns:
+          A string identifying the publisher, may be empty or non-unique.
+        """
+        return self._identifier
