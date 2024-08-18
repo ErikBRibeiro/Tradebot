@@ -1,39 +1,57 @@
 import threading
 import time
-from config import API_KEY, API_SECRET, SYMBOL, QUANTITY, INTERVAL, SETUP
+from config import API_KEY, API_SECRET
 from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
+from src.parameters import ativo, timeframe, setup  # Importa variáveis de parameters.py
+
+from binance.exceptions import BinanceAPIException
+from requests.exceptions import ConnectionError, Timeout
 
 def check_last_transaction(data_interface, symbol):
     try:
+        logger.info(f"Verificando última transação para {symbol} (Spot)")
+        
+        # Verifique se há histórico de transações
         trades = data_interface.client.get_my_trades(symbol=symbol, limit=5)
-        if not trades:
+        
+        if not trades or len(trades) == 0:
+            logger.info("Nenhuma transação encontrada. Pode ser que não haja histórico de transações para este símbolo.")
             return False
+
         trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
         last_trade = trades_sorted[0]
-        is_buy = last_trade['isBuyer']
+        is_buy = last_trade['isBuyer']  # Verifica se foi uma compra
         return is_buy
+    except BinanceAPIException as e:
+        logger.error(f"Erro na API Binance ao verificar a última transação: {e}")
+        return False
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
         return False
 
+
 def main_loop():
     start_prometheus_server(8000)
-    metrics = Metrics(SYMBOL)
-    data_interface = LiveData(API_KEY, API_SECRET)
-    strategy = TradingStrategy(data_interface, metrics, SYMBOL, QUANTITY, INTERVAL, SETUP)
+    metrics = Metrics(ativo)  
+    
+    # Remova o argumento 'futures' ao instanciar LiveData
+    data_interface = LiveData(API_KEY, API_SECRET)  
+    logger.info(API_KEY)
+    logger.info(API_SECRET)
+    strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
     is_comprado_logged = False
     is_not_comprado_logged = False
     is_buy = False
     trade_history = read_trade_history()
 
-    last_log_time = time.time()  # Inicializa o temporizador de logs
+    last_log_time = time.time() 
 
-    # Inicia a atualização contínua do preço em uma thread separada
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(SYMBOL, 20))
+    # Reduza a frequência para uma requisição a cada 5 segundos
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 0.2))  
     price_thread.daemon = True
     price_thread.start()
 
@@ -41,8 +59,9 @@ def main_loop():
         try:
             current_time = time.time()
 
-            is_buy = check_last_transaction(data_interface, SYMBOL)
-            metrics.loop_counter_metric.labels(SYMBOL).inc()
+            # Ativar novamente a verificação de transações para Spot
+            is_buy = check_last_transaction(data_interface, ativo)
+            metrics.loop_counter_metric.labels(ativo).inc()
 
             if is_buy and not is_comprado_logged:
                 if current_time - last_log_time >= 120:
@@ -61,13 +80,6 @@ def main_loop():
                 if current_time - last_log_time >= 120:
                     logger.info("Executando lógica de venda...")
                     last_log_time = current_time
-                # is_buy, trade_history = strategy.sell_logic(
-                #     trade_history['valor_compra'].iloc[-1],
-                #     trade_history,
-                #     trade_history['min_referencia'].iloc[-1],
-                #     trade_history['max_referencia'].iloc[-1],
-                #     current_time
-                # )
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
             else:
                 if current_time - last_log_time >= 120:
