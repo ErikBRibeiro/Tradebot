@@ -51,6 +51,9 @@ class Publisher:
 
     Subscribers who wish to stop receiving updates from a publisher may detach
     themselves by calling the publisher's unsubscribe method.
+
+    Attributes:
+      subscribers: A list of all Subscribers currently listening for events.
     """
     def __init__(self, subscribers: Optional[list[Subscriber]] = None):
         self._subscribers: list[Subscriber] = subscribers if subscribers else []
