@@ -5,15 +5,15 @@ code by implementing an abstract class Subscriber and by utilizing the concrete
 class Publisher to notify all attached subscribers of any update / notification.
 
 Typical usage example:
-    subscriber_a: Subscriber
-    subscriber_b: Subscriber
+  subscriber_a: Subscriber
+  subscriber_b: Subscriber
 
-    events = Publisher()
-    events.subscribe(subscriber_a)
-    events.subscribe(subscriber_b)
+  events = Publisher()
+  events.subscribe(subscriber_a)
+  events.subscribe(subscriber_b)
 
-    events.notify("hello", "how are you")
-    # subscribers A and B are called with update("hello", "how are you")
+  events.notify("hello", "how are you")
+  # subscribers A and B are called with update("hello", "how are you")
 """
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -107,9 +107,9 @@ class Publisher:
         """Subscribers to be updated on the next notification.
 
         Returns:
-            A list of subscribers associated with this publisher who will be
-            called the next time someone utilizes the notify method of the
-            publisher. This list can be modified at any time with the subscribe
-            and unsubscribe methods.
+          A list of subscribers associated with this publisher who will be
+          called the next time someone utilizes the notify method of the
+          publisher. This list can be modified at any time with the subscribe
+          and unsubscribe methods.
         """
         return self._subscribers
