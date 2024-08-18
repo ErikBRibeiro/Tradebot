@@ -99,7 +99,7 @@ class Publisher:
             if sub == subscriber:
                 self._subscribers.pop(idx)
 
-    def notify(self, event: str, data: object) -> None:
+    def notify(self, event: str, data: object = None) -> None:
         """Notifies all subscribers about an event, with accompanying data.
 
         Calls all subscribers in the publisher's subscription list with their
