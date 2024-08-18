@@ -55,8 +55,9 @@ class Publisher:
     Attributes:
       subscribers: A list of all Subscribers currently listening for events.
     """
+    _subscribers: list[Subscriber]
     def __init__(self, subscribers: Optional[list[Subscriber]] = None):
-        self._subscribers: list[Subscriber] = subscribers if subscribers else []
+        self._subscribers = subscribers if subscribers else []
 
     def subscribe(self, subscriber: Subscriber) -> None:
         """Attaches a subscriber to the Publisher.
