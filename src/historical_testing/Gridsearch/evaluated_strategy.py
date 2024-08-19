@@ -4,7 +4,11 @@ import utils
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
+from pubsub import Publisher
+
 class EvaluatedStrategy:
+    _events: Publisher
+
     def __init__(self, identifier, starting_balance, trading_tax,
                  historical_data, short_period, long_period, stop_candles,
                  ratio):
@@ -45,9 +49,7 @@ class EvaluatedStrategy:
         self.min_balance_since_max = starting_balance
         self.max_drawdown = 0
 
-        self.trades = []
-        self.losses = []
-        self.gains = []
+        self._events = Publisher(f"EvaluatedStrategy_{identifier}")
 
         self.current_trade = None
         self.stop_gain = None
@@ -58,11 +60,25 @@ class EvaluatedStrategy:
         open_time = candle.open_time
         current_month_results = self.monthly_results[open_time.year][open_time.month]
 
+        basic_info = {
+            "open_time": open_time,
+            "candle": candle,
+            "previous_candle": previous_candle,
+            "balance": self.balance
+        }
+
+        self.events.notify("fetch", {
+            **basic_info,
+            "is_holding": self.is_holding
+        })
+
         if current_month_results['saldo_inicial'] is None:
             current_month_results['saldo_inicial'] = self.balance
 
         if not self.is_holding:
             # same logic as buy_double_ema_breakout but optimized
+            self.events.notify("consider_buy", basic_info)
+
             if not candle.high > previous_candle.high:
                 return
 
@@ -84,6 +100,13 @@ class EvaluatedStrategy:
             current_month_results['saldo_final'] = self.balance
             self.stop_gain = StopGain.set_sell_stopgain_ratio(self.buy_price, self.stop_loss, self.ratio)
             self.is_holding = True
+
+            self.events.notify("buy", {
+                **basic_info,
+                "buy_price": self.buy_price,
+                "stop_loss": self.stop_loss,
+                "stop_gain": self.stop_gain,
+            })
 
             self.current_trade = {
                 'open_time': open_time,
@@ -109,8 +132,11 @@ class EvaluatedStrategy:
             self.current_trade['close_time'] = open_time
             self.current_trade['outcome'] = loss_percentage
             self.current_trade['result'] = 'StopLoss'
-            self.trades.append(self.current_trade)
-            self.losses.append(-(loss_percentage + self.trading_tax))
+
+            self.events.notify("sell", {
+                **basic_info,
+                "profit": -(loss_percentage + self.trading_tax)
+            })
 
             if self.balance < self.min_balance_since_max:
                 self.min_balance_since_max = self.balance
@@ -133,9 +159,11 @@ class EvaluatedStrategy:
             self.current_trade['close_time'] = open_time
             self.current_trade['outcome'] = profit
             self.current_trade['result'] = 'StopGain'
-            self.trades.append(self.current_trade)
 
-            self.gains.append(profit - self.trading_tax)
+            self.events.notify("sell", {
+                **basic_info,
+                "profit": profit - self.trading_tax
+            })
 
             if self.balance > self.max_balance:
                 self.max_balance = self.balance
@@ -147,9 +175,10 @@ class EvaluatedStrategy:
     def metrics(self):
         return {
             "balance": self.balance,
-            "trades": self.trades,
             "monthly_results": self.monthly_results,
             "max_drawdown": self.max_drawdown,
-            "gains": self.gains,
-            "losses": self.losses
         }
+
+    @property
+    def events(self):
+        return self._events
