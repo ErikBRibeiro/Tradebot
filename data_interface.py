@@ -13,22 +13,35 @@ class LiveData:
         else:
             self.client = HTTP("https://api.bybit.com", api_key=api_key, api_secret=api_secret)
         self.current_price = None
+        self.limit_status = None
+        self.limit_reset_timestamp = None
+
+    def check_rate_limit(self, headers):
+        self.limit_status = int(headers.get("X-Bapi-Limit-Status", -1))
+        self.limit_reset_timestamp = int(headers.get("X-Bapi-Limit-Reset-Timestamp", time.time()))
+
+        if self.limit_status == 0:
+            sleep_time = max(0, self.limit_reset_timestamp - time.time())
+            logger.warning(f"Rate limit exceeded. Sleeping for {sleep_time} seconds.")
+            time.sleep(sleep_time + 1)  # Sleep for an extra second to ensure reset.
 
     def get_historical_data(self, symbol, interval, limit=150):
         try:
             if self.futures:
-                klines = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
+                response = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
             else:
-                klines = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
+                response = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
 
-            data = pd.DataFrame(klines['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
+            # Check rate limit from headers
+            self.check_rate_limit(response.headers)
+
+            data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
             data['volume'] = data['volume'].apply(safe_float_conversion)
-            
-            
+
             data[f'EMA_{short_period}'] = data['close'].ewm(span=short_period, adjust=False).mean()
             data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
 
@@ -45,9 +58,14 @@ class LiveData:
     def get_current_price(self, symbol):
         try:
             if self.futures:
-                ticker = float(self.client.latest_information_for_symbol(symbol=symbol)['result'][0]['last_price'])
+                response = self.client.latest_information_for_symbol(symbol=symbol)
             else:
-                ticker = float(self.client.latest_information_for_symbol(symbol=symbol)['result'][0]['last_price'])
+                response = self.client.latest_information_for_symbol(symbol=symbol)
+
+            # Check rate limit from headers
+            self.check_rate_limit(response.headers)
+
+            ticker = float(response['result'][0]['last_price'])
             return ticker
         except Exception as e:
             logger.error(f"Erro inesperado ao obter preço atual: {e}")
@@ -56,19 +74,26 @@ class LiveData:
     def get_current_balance(self, asset):
         try:
             if self.futures:
-                balance_info = self.client.get_wallet_balance()
-                return float(balance_info['result'][asset]['equity'])
+                response = self.client.get_wallet_balance()
             else:
-                balance_info = self.client.get_wallet_balance()
-                return float(balance_info['result'][asset]['equity'])
+                response = self.client.get_wallet_balance()
+
+            # Check rate limit from headers
+            self.check_rate_limit(response.headers)
+
+            return float(response['result'][asset]['equity'])
         except Exception as e:
             logger.error(f"Erro inesperado ao obter saldo: {e}")
             return 0.0
 
     def get_lot_size(self, symbol):
         try:
-            info = self.client.query_symbol()
-            for s in info['result']:
+            response = self.client.query_symbol()
+
+            # Check rate limit from headers
+            self.check_rate_limit(response.headers)
+
+            for s in response['result']:
                 if s['name'] == symbol:
                     return float(s['lot_size_filter']['min_trading_qty'])
             return None
@@ -80,21 +105,25 @@ class LiveData:
         try:
             if self.futures:
                 if side.lower() == 'buy':
-                    order = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
+                    response = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
                 elif side.lower() == 'sell':
-                    order = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
+                    response = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
                 else:
                     logger.error(f"Tipo de ordem não reconhecido: {side}")
                     return None
             else:
                 if side.lower() == 'buy':
-                    order = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
+                    response = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
                 elif side.lower() == 'sell':
-                    order = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
+                    response = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
                 else:
                     logger.error(f"Tipo de ordem não reconhecido: {side}")
                     return None
-            return order
+
+            # Check rate limit from headers
+            self.check_rate_limit(response.headers)
+
+            return response
         except Exception as e:
             logger.error(f"Erro inesperado ao criar ordem: {e}")
             return None
