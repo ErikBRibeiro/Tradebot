@@ -38,7 +38,7 @@ def main_loop():
     last_log_time = time.time()  
 
     
-    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 20))
+    price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 1))
     price_thread.daemon = True
     price_thread.start()
 
