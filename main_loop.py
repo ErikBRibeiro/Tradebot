@@ -5,17 +5,17 @@ from data_interface import LiveData
 from strategy import TradingStrategy
 from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
-from src.parameters import ativo, timeframe, setup  # Importa variáveis de parameters.py
+from src.parameters import ativo, timeframe, setup  
 
 def check_last_transaction(data_interface, symbol):
     try:
-        # Alteração para usar o método de futuros
-        trades = data_interface.client.futures_account_trades(symbol=symbol, limit=5)
+        
+        trades = data_interface.client.user_trade_records(symbol=symbol, limit=5)
         if not trades:
             return False
-        trades_sorted = sorted(trades, key=lambda x: x['time'], reverse=True)
+        trades_sorted = sorted(trades['result']['data'], key=lambda x: x['exec_time'], reverse=True)
         last_trade = trades_sorted[0]
-        is_buy = last_trade['side'] == 'BUY'  # Verifica se foi uma compra
+        is_buy = last_trade['side'] == 'Buy'  
         return is_buy
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
@@ -23,9 +23,9 @@ def check_last_transaction(data_interface, symbol):
 
 def main_loop():
     start_prometheus_server(8000)
-    metrics = Metrics(ativo)  # Usa o ativo definido em parameters.py
+    metrics = Metrics(ativo)  
     
-    # Modificação para inicializar a interface de dados com futuros
+    
     data_interface = LiveData(API_KEY, API_SECRET, futures=True)
     
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
@@ -35,9 +35,9 @@ def main_loop():
     is_buy = False
     trade_history = read_trade_history()
 
-    last_log_time = time.time()  # Inicializa o temporizador de logs
+    last_log_time = time.time()  
 
-    # Inicia a atualização contínua do preço em uma thread separada
+    
     price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 20))
     price_thread.daemon = True
     price_thread.start()
