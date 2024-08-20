@@ -13,15 +13,13 @@ class LiveData:
         else:
             self.client = HTTP("https://api.bybit.com", api_key=api_key, api_secret=api_secret)
         self.current_price = None
-        self.limit_status = None
-        self.limit_reset_timestamp = None
 
     def check_rate_limit(self, headers):
-        self.limit_status = int(headers.get("X-Bapi-Limit-Status", -1))
-        self.limit_reset_timestamp = int(headers.get("X-Bapi-Limit-Reset-Timestamp", time.time()))
+        limit_status = int(headers.get("X-Bapi-Limit-Status", -1))
+        limit_reset_timestamp = int(headers.get("X-Bapi-Limit-Reset-Timestamp", time.time()))
 
-        if self.limit_status == 0:
-            sleep_time = max(0, self.limit_reset_timestamp - time.time())
+        if limit_status <= 2:
+            sleep_time = max(0, limit_reset_timestamp - time.time())
             logger.warning(f"Rate limit exceeded. Sleeping for {sleep_time} seconds.")
             time.sleep(sleep_time + 1)  # Sleep for an extra second to ensure reset.
 
