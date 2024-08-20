@@ -22,11 +22,11 @@ def check_last_transaction(data_interface, symbol):
         return False
 
 def main_loop():
-    start_prometheus_server(8000)
+    #start_prometheus_server(8000)
     metrics = Metrics(ativo)  
     
     
-    data_interface = LiveData(API_KEY, API_SECRET, futures=True)
+    data_interface = LiveData(API_KEY, API_SECRET)
     
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 

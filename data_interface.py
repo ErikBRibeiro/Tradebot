@@ -1,6 +1,6 @@
 import time
 import pandas as pd
-from pybit import HTTP
+from pybit.unified_trading import HTTP
 from requests.exceptions import ConnectionError, Timeout
 from src.parameters import short_period, long_period
 from src.utils import logger, safe_float_conversion
@@ -9,9 +9,9 @@ class LiveData:
     def __init__(self, api_key, api_secret, futures=False):
         self.futures = futures
         if self.futures:
-            self.client = HTTP("https://api.bybit.com", api_key=api_key, api_secret=api_secret)
+            self.client = HTTP(api_key=api_key, api_secret=api_secret)
         else:
-            self.client = HTTP("https://api.bybit.com", api_key=api_key, api_secret=api_secret)
+            self.client = HTTP(api_key=api_key, api_secret=api_secret)
         self.current_price = None
 
     def check_rate_limit(self, headers):
@@ -26,13 +26,13 @@ class LiveData:
     def get_historical_data(self, symbol, interval, limit=150):
         try:
             if self.futures:
-                response = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
+                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
             else:
-                response = self.client.query_kline(symbol=symbol, interval=interval, limit=limit)
+                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
 
             # Check rate limit from headers
-            self.check_rate_limit(response.headers)
-
+            #self.check_rate_limit(response.headers)
+            print(response)
             data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
@@ -56,12 +56,12 @@ class LiveData:
     def get_current_price(self, symbol):
         try:
             if self.futures:
-                response = self.client.latest_information_for_symbol(symbol=symbol)
+                response = self.client.get_tickers(symbol=symbol, category='linear')
             else:
-                response = self.client.latest_information_for_symbol(symbol=symbol)
+                response = self.client.get_tickers(symbol=symbol, category='linear')
 
             # Check rate limit from headers
-            self.check_rate_limit(response.headers)
+            #self.check_rate_limit(response.headers)
 
             ticker = float(response['result'][0]['last_price'])
             return ticker
@@ -77,7 +77,7 @@ class LiveData:
                 response = self.client.get_wallet_balance()
 
             # Check rate limit from headers
-            self.check_rate_limit(response.headers)
+            #self.check_rate_limit(response.headers)
 
             return float(response['result'][asset]['equity'])
         except Exception as e:
@@ -89,7 +89,7 @@ class LiveData:
             response = self.client.query_symbol()
 
             # Check rate limit from headers
-            self.check_rate_limit(response.headers)
+            #self.check_rate_limit(response.headers)
 
             for s in response['result']:
                 if s['name'] == symbol:
@@ -119,7 +119,7 @@ class LiveData:
                     return None
 
             # Check rate limit from headers
-            self.check_rate_limit(response.headers)
+            #self.check_rate_limit(response.headers)
 
             return response
         except Exception as e:

@@ -1,6 +1,6 @@
 # Parâmetros da estratégia
 ativo = 'BTCUSDT'
-timeframe = '15m'
+timeframe = '15' #15m
 alavancagem = 1
 short_period = 5
 long_period = 15

@@ -23,7 +23,8 @@ class TradingStrategy:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.query_kline(symbol=self.symbol, interval=self.interval, limit=150)
+        klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
+        print(klines)
         data = pd.DataFrame(klines['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
@@ -91,7 +92,8 @@ class TradingStrategy:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.query_kline(symbol=self.symbol, interval=self.interval, limit=150)
+        klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
+        print(klines)
         data = pd.DataFrame(klines['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
         data['close'] = data['close'].apply(safe_float_conversion)
