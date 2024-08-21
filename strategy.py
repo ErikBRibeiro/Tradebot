@@ -41,6 +41,7 @@ class TradingStrategy:
             stoploss = trade_history['stoploss'].iloc[-1]
             stopgain = trade_history['stopgain'].iloc[-1]
         else:
+            # Definir stoploss e stopgain com valores padrões ou retornar
             logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
             return True, trade_history
 
@@ -70,14 +71,13 @@ class TradingStrategy:
                         return False, trade_history  
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
-                else:
-                    logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
-                self.position_maintained = False
-                return False, trade_history
+            else:
+                logger.info("Saldo de ativo insuficiente para venda.")
+            self.position_maintained = False
+            return False, trade_history
 
         logger.info("Condições de venda não atendidas, mantendo posição.")
         return True, trade_history  
-
 
     def buy_logic(self, trade_history, current_time):
         if not self.position_maintained:
@@ -102,8 +102,8 @@ class TradingStrategy:
 
         current_price = data['close'].iloc[-1]
 
-        # Log apenas a cada 1200 segundos
-        if current_time - self.last_log_time >= 1200:
+        # Log apenas a cada 120 segundos, se for necessário
+        if current_time - self.last_log_time >= 120:
             logger.info(f"Condições de compra atendidas, tentando executar compra... Preço atual: {current_price}")
             self.last_log_time = current_time  # Atualiza o tempo do último log
 
@@ -164,4 +164,3 @@ class TradingStrategy:
                 logger.error("Saldo insuficiente em USDT para realizar a compra.")
 
         return False, trade_history
-
