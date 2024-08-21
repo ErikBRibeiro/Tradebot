@@ -58,9 +58,11 @@ def main_loop():
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
+    # Log para indicar que o bot foi iniciado
+    logger.info("SandsBot Bybit iniciado")
+
     is_comprado_logged = False
     is_not_comprado_logged = False
-    last_log_time = time.time()
 
     trade_history = read_trade_history()
 
@@ -84,14 +86,6 @@ def main_loop():
                 logger.info("Bot v2 iniciado - Loop de compra.")
                 is_not_comprado_logged = True
                 is_comprado_logged = False
-
-            # Log apenas a cada 1200 segundos
-            if current_time - last_log_time >= 1200:
-                if is_buy:
-                    logger.info("Executando lógica de venda...")
-                else:
-                    logger.info("Executando lógica de compra...")
-                last_log_time = current_time  # Atualiza o tempo do último log
 
             if is_buy:
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
