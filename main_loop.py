@@ -78,29 +78,20 @@ def main_loop():
             metrics.loop_counter_metric.labels(ativo).inc()
 
             if is_buy and not is_comprado_logged:
-                if current_time - last_log_time >= 120:
-                    logger.info("Bot v2 iniciado - Loop de venda.")
-                    last_log_time = current_time
+                logger.info("Bot v2 iniciado - Loop de venda.")
                 is_comprado_logged = True
                 is_not_comprado_logged = False
 
             if not is_buy and not is_not_comprado_logged:
-                if current_time - last_log_time >= 120:
-                    logger.info("Bot v2 iniciado - Loop de compra.")
-                    last_log_time = current_time
+                logger.info("Bot v2 iniciado - Loop de compra.")
                 is_not_comprado_logged = True
+                is_comprado_logged = False
 
             if is_buy:
-                if current_time - last_log_time >= 120:
-                    logger.info("Executando lógica de venda...")
-                    last_log_time = current_time
-                # Passe trade_history para a lógica de venda
+                logger.info("Executando lógica de venda...")
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
             else:
-                if current_time - last_log_time >= 120:
-                    logger.info("Executando lógica de compra...")
-                    last_log_time = current_time
-                # Passe trade_history para a lógica de compra
+                logger.info("Executando lógica de compra...")
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
 
         except Exception as e:
@@ -109,4 +100,3 @@ def main_loop():
 
 if __name__ == "__main__":
     main_loop()
-
