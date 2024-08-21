@@ -19,9 +19,15 @@ class TradingStrategy:
         self.last_log_time = time.time() 
 
     def sell_logic(self, trade_history, current_time):
+    # Evitar execuções muito frequentes
+        if current_time - self.last_log_time < 120:
+            return True, trade_history
+
+        self.last_log_time = current_time
+
         if not self.position_maintained:
             logger.info("Loop de venda - Checando condições de venda.")
-            self.position_maintained = True
+        self.position_maintained = True
 
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
         candles = klines['result']['list']
@@ -172,5 +178,3 @@ class TradingStrategy:
             logger.info("Condições de compra não atendidas.")
             self.last_log_time = current_time
         return False, trade_history
-    #
-
