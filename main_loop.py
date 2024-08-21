@@ -61,7 +61,6 @@ def main_loop():
     is_comprado_logged = False
     is_not_comprado_logged = False
     last_log_time = time.time()
-    last_action_time = time.time()  # Variável para controlar a frequência de logging
 
     trade_history = read_trade_history()
 
@@ -72,10 +71,6 @@ def main_loop():
     while True:
         try:
             current_time = time.time()
-
-            # Checar se o tempo desde a última ação é menor que 120 segundos
-            if current_time - last_action_time < 120:
-                continue  # Ignorar loop até passar 120 segundos
 
             is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
@@ -90,14 +85,18 @@ def main_loop():
                 is_not_comprado_logged = True
                 is_comprado_logged = False
 
+            # Log apenas a cada 1200 segundos
+            if current_time - last_log_time >= 1200:
+                if is_buy:
+                    logger.info("Executando lógica de venda...")
+                else:
+                    logger.info("Executando lógica de compra...")
+                last_log_time = current_time  # Atualiza o tempo do último log
+
             if is_buy:
-                logger.info("Executando lógica de venda...")
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
             else:
-                logger.info("Executando lógica de compra...")
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
-
-            last_action_time = current_time  # Atualiza o tempo da última ação
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")

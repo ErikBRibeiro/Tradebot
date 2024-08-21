@@ -16,18 +16,12 @@ class TradingStrategy:
         self.interval = interval
         self.setup = setup
         self.position_maintained = False
-        self.last_log_time = time.time() 
+        self.last_log_time = time.time()
 
     def sell_logic(self, trade_history, current_time):
-    # Evitar execuções muito frequentes
-        if current_time - self.last_log_time < 120:
-            return True, trade_history
-
-        self.last_log_time = current_time
-
         if not self.position_maintained:
             logger.info("Loop de venda - Checando condições de venda.")
-        self.position_maintained = True
+            self.position_maintained = True
 
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
         candles = klines['result']['list']
@@ -37,26 +31,24 @@ class TradingStrategy:
         data['low'] = data['low'].apply(safe_float_conversion)
         data['high'] = data['high'].apply(safe_float_conversion)
 
-        if current_time - self.last_log_time >= 120:
-            logger.info("Obtendo preço atual...")
-        ticker = self.data_interface.get_current_price(self.symbol)
-        if ticker is None:
-            if current_time - self.last_log_time >= 120:
+        # Log apenas a cada 1200 segundos
+        if current_time - self.last_log_time >= 1200:
+            ticker = self.data_interface.get_current_price(self.symbol)
+            if ticker is None:
                 logger.warning("Preço atual não obtido. Tentando novamente...")
-            return True, trade_history
+            else:
+                logger.info(f"Preço atual obtido: {ticker}")
 
-        if current_time - self.last_log_time >= 120:
-            logger.info(f"Preço atual obtido: {ticker}")
-
-        stoploss = trade_history['stoploss'].iloc[-1]
-        stopgain = trade_history['stopgain'].iloc[-1]
-
-        if current_time - self.last_log_time >= 120:
+            stoploss = trade_history['stoploss'].iloc[-1]
+            stopgain = trade_history['stopgain'].iloc[-1]
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
+            self.last_log_time = current_time  # Atualiza o tempo do último log
+        else:
+            ticker = self.data_interface.get_current_price(self.symbol)
+            if ticker is None:
+                return True, trade_history
 
         if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
-            if current_time - self.last_log_time >= 120:
-                logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
             balance_asset = self.data_interface.get_current_balance('USDT')
             lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
@@ -74,24 +66,14 @@ class TradingStrategy:
                         trade_history = update_trade_history(trade_history, ticker)  
                         self.metrics.update_metrics_on_sell(ticker, self.symbol)
                         self.position_maintained = False
-                        self.last_log_time = current_time
                         return False, trade_history  
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
-                else:
-                    if current_time - self.last_log_time >= 120:
-                        logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
-                    self.position_maintained = False
-                    return False, trade_history
             else:
-                if current_time - self.last_log_time >= 120:
-                    logger.info("Saldo de ativo insuficiente para venda.")
-                self.position_maintained = False
-                return False, trade_history
+                logger.info("Saldo de ativo insuficiente para venda.")
+            self.position_maintained = False
+            return False, trade_history
 
-        if current_time - self.last_log_time >= 120:
-            logger.info("Condições de venda não atendidas, mantendo posição.")
-            self.last_log_time = current_time
         return True, trade_history  
 
     def buy_logic(self, trade_history, current_time):
@@ -117,8 +99,12 @@ class TradingStrategy:
 
         current_price = data['close'].iloc[-1]
 
+        # Log apenas a cada 1200 segundos
+        if current_time - self.last_log_time >= 1200:
+            logger.info(f"Condições de compra atendidas, tentando executar compra... Preço atual: {current_price}")
+            self.last_log_time = current_time  # Atualiza o tempo do último log
+
         if buy_double_ema_breakout(data, f'EMA_{short_period}', f'EMA_{long_period}'):
-            logger.info("Condições de compra atendidas, tentando executar compra...")
             start_time = time.time()
 
             balance_usdt = self.data_interface.get_current_balance('USDT')
@@ -174,7 +160,5 @@ class TradingStrategy:
             else:
                 logger.error("Saldo insuficiente em USDT para realizar a compra.")
 
-        if current_time - self.last_log_time >= 120:
-            logger.info("Condições de compra não atendidas.")
-            self.last_log_time = current_time
         return False, trade_history
+
