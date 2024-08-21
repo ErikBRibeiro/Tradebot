@@ -33,9 +33,7 @@ class LiveData:
             else:
                 response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
 
-            # Check rate limit from headers
-            #self.check_rate_limit(response.headers)
-            #print(response)
+
             data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
             data['close'] = data['close'].apply(safe_float_conversion)

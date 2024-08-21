@@ -56,6 +56,7 @@ def check_open_position(data_interface, symbol):
 
 
 def main_loop():
+    start_prometheus_server(8000)
     metrics = Metrics(ativo)  
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)

@@ -26,7 +26,6 @@ class TradingStrategy:
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
         candles = klines['result']['list']
         
-        #print(klines)
         data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
@@ -95,9 +94,7 @@ class TradingStrategy:
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
         candles = klines['result']['list']
         
-        #print(klines)
         data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
-        #print(data)
 
         data['close'] = data['close'].apply(safe_float_conversion)
         data['low'] = data['low'].apply(safe_float_conversion)
@@ -118,12 +115,10 @@ class TradingStrategy:
 
             
             balance_usdt = self.data_interface.get_current_balance('USDT')
-            print(balance_usdt)
             if balance_usdt > 0:
                 
                 quantity_to_buy = (balance_usdt / current_price) #* 0.998
                 truncated_quantity = int(quantity_to_buy * 1000) / 1000 #truncado do jeito que deu :)
-                print(truncated_quantity)
                 
                 lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
                 if lot_size:
