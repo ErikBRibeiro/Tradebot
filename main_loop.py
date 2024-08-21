@@ -54,7 +54,6 @@ def check_open_position(data_interface, symbol):
 
 
 def main_loop():
-    start_prometheus_server(8000)
     metrics = Metrics(ativo)  
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
@@ -62,8 +61,8 @@ def main_loop():
     is_comprado_logged = False
     is_not_comprado_logged = False
     last_log_time = time.time()
+    last_action_time = time.time()  # Variável para controlar a frequência de logging
 
-    # Inicializa trade_history corretamente usando a função ajustada
     trade_history = read_trade_history()
 
     price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 1))
@@ -73,6 +72,10 @@ def main_loop():
     while True:
         try:
             current_time = time.time()
+
+            # Checar se o tempo desde a última ação é menor que 120 segundos
+            if current_time - last_action_time < 120:
+                continue  # Ignorar loop até passar 120 segundos
 
             is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
@@ -93,6 +96,8 @@ def main_loop():
             else:
                 logger.info("Executando lógica de compra...")
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
+
+            last_action_time = current_time  # Atualiza o tempo da última ação
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")
