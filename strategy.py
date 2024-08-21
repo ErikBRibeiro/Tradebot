@@ -24,8 +24,10 @@ class TradingStrategy:
             self.position_maintained = True
 
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-        print(klines)
-        data = pd.DataFrame(klines['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
+        candles = klines['result']['list']
+        
+        #print(klines)
+        data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
         data['high'] = data['high'].apply(safe_float_conversion)
@@ -93,8 +95,11 @@ class TradingStrategy:
             self.position_maintained = True
 
         klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-        print(klines)
-        data = pd.DataFrame(klines['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
+        candles = klines['result']['list']
+        
+        #print(klines)
+        data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
+        #print(data)
 
         data['close'] = data['close'].apply(safe_float_conversion)
         data['low'] = data['low'].apply(safe_float_conversion)

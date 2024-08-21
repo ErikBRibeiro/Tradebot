@@ -7,6 +7,8 @@ from src.utils import logger, safe_float_conversion
 
 class LiveData:
     def __init__(self, api_key, api_secret, futures=False):
+        self.api_key = api_key 
+        self.api_secret = api_secret
         self.futures = futures
         if self.futures:
             self.client = HTTP(api_key=api_key, api_secret=api_secret)
@@ -32,7 +34,7 @@ class LiveData:
 
             # Check rate limit from headers
             #self.check_rate_limit(response.headers)
-            print(response)
+            #print(response)
             data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
@@ -60,14 +62,29 @@ class LiveData:
             else:
                 response = self.client.get_tickers(symbol=symbol, category='linear')
 
-            # Check rate limit from headers
-            #self.check_rate_limit(response.headers)
+            # Loga a resposta bruta para verificar o conteúdo
+            #logger.info(f"Resposta da API ao obter preço: {response}")
 
-            ticker = float(response['result'][0]['last_price'])
+            # Verifique se 'result' existe e não está vazio
+            if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
+                logger.error(f"Erro ao obter preço: resposta inválida ou vazia.")
+                return 0  # Retorna 0 em caso de erro
+
+            # Verifique o conteúdo do primeiro resultado
+            if 'lastPrice' not in response['result']['list'][0]:
+                logger.error(f"Erro ao obter preço: campo 'lastPrice' não encontrado.")
+                return 0  # Retorna 0 se o campo não for encontrado
+
+            # Extraia o preço corretamente
+            ticker = float(response['result']['list'][0]['lastPrice'])
+            logger.info(f"Preço atual obtido: {ticker}")
             return ticker
         except Exception as e:
             logger.error(f"Erro inesperado ao obter preço atual: {e}")
-            return None
+            return 0
+
+
+
 
     def get_current_balance(self, asset):
         try:

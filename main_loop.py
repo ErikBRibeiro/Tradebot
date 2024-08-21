@@ -9,35 +9,61 @@ from src.parameters import ativo, timeframe, setup
 
 def check_last_transaction(data_interface, symbol):
     try:
+        # Obtém a posição atual
+        response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
         
-        trades = data_interface.client.user_trade_records(symbol=symbol, limit=5)
-        if not trades:
-            return False
-        trades_sorted = sorted(trades['result']['data'], key=lambda x: x['exec_time'], reverse=True)
-        last_trade = trades_sorted[0]
-        is_buy = last_trade['side'] == 'Buy'  
-        return is_buy
+        # Verifique se a resposta contém resultados
+        if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
+            logger.info("Nenhuma posição encontrada. Considerando executar uma compra...")
+            return False  # Nenhuma transação anterior, pode comprar
+        
+        # Obtém a posição e verifica o tamanho
+        position = response['result']['list'][0]
+        size = float(position['size'])
+
+        if size > 0:
+            logger.info(f"Posição aberta encontrada: {position['side']} com tamanho {size}")
+            return True  # Já há uma posição long, não compra novamente
+        else:
+            logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
+            return False  # Não há posição ativa, pode comprar
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
         return False
 
+
+def check_open_position(data_interface, symbol):
+    try:
+        response = data_interface.client.get_positions(symbol=symbol)
+        
+        if not response or 'result' not in response or len(response['result']) == 0:
+            logger.info("Nenhuma posição aberta encontrada.")
+            return None  # Nenhuma posição aberta
+        
+        # Verifica a posição aberta
+        position = response['result'][0]
+        side = position['side']  # "Buy" para long
+        size = float(position['size'])
+
+        if size > 0:
+            logger.info(f"Posição aberta encontrada: {side} com tamanho {size}")
+            return side  # Retorna "Buy"
+        else:
+            return None  # Nenhuma posição relevante encontrada
+    except Exception as e:
+        logger.error(f"Erro ao verificar posição aberta: {e}")
+        return None
+
+
 def main_loop():
-    #start_prometheus_server(8000)
     metrics = Metrics(ativo)  
-    
-    
     data_interface = LiveData(API_KEY, API_SECRET)
-    
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
-    is_comprado_logged = False
+    is_comprado_logged = False  # Inicializar variáveis de estado
     is_not_comprado_logged = False
-    is_buy = False
-    trade_history = read_trade_history()
+    last_log_time = time.time()
 
-    last_log_time = time.time()  
-
-    
     price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 1))
     price_thread.daemon = True
     price_thread.start()
@@ -71,10 +97,7 @@ def main_loop():
                 if current_time - last_log_time >= 120:
                     logger.info("Executando lógica de compra...")
                     last_log_time = current_time
-                is_buy, trade_history = strategy.buy_logic(
-                    trade_history,
-                    current_time
-                )
+                is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
 
         except Exception as e:
             logger.error(f"Erro inesperado: {e}")
