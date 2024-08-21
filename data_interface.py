@@ -4,6 +4,7 @@ from pybit.unified_trading import HTTP
 from requests.exceptions import ConnectionError, Timeout
 from src.parameters import short_period, long_period
 from src.utils import logger, safe_float_conversion
+import os
 
 class LiveData:
     def __init__(self, api_key, api_secret, futures=False):
@@ -89,29 +90,21 @@ class LiveData:
     def get_current_balance(self, asset):
         try:
             if self.futures:
-                response = self.client.get_wallet_balance()
+                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
             else:
-                response = self.client.get_wallet_balance()
+                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
 
-            # Check rate limit from headers
-            #self.check_rate_limit(response.headers)
-
-            return float(response['result'][asset]['equity'])
+            return float(response['result']['list'][0]['totalEquity'])
         except Exception as e:
             logger.error(f"Erro inesperado ao obter saldo: {e}")
             return 0.0
 
-    def get_lot_size(self, symbol):
+    def get_lot_size(self, symbol, data_interface):
         try:
-            response = self.client.query_symbol()
+            response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
+            response = response['result']['list'][0]['size']
+            return response
 
-            # Check rate limit from headers
-            #self.check_rate_limit(response.headers)
-
-            for s in response['result']:
-                if s['name'] == symbol:
-                    return float(s['lot_size_filter']['min_trading_qty'])
-            return None
         except Exception as e:
             logger.error(f"Erro inesperado ao obter LOT_SIZE: {e}")
             return None
@@ -120,17 +113,14 @@ class LiveData:
         try:
             if self.futures:
                 if side.lower() == 'buy':
-                    response = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
-                elif side.lower() == 'sell':
-                    response = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
                 else:
-                    logger.error(f"Tipo de ordem não reconhecido: {side}")
-                    return None
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
             else:
                 if side.lower() == 'buy':
-                    response = self.client.place_active_order(symbol=symbol, side="Buy", order_type="Market", qty=quantity)
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
                 elif side.lower() == 'sell':
-                    response = self.client.place_active_order(symbol=symbol, side="Sell", order_type="Market", qty=quantity)
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
                 else:
                     logger.error(f"Tipo de ordem não reconhecido: {side}")
                     return None
@@ -143,6 +133,15 @@ class LiveData:
             logger.error(f"Erro inesperado ao criar ordem: {e}")
             return None
 
+    def close_order(self, symbol):
+        try:
+            response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Sell', orderType="Market", qty=0, reduceOnly=True, closeOnTrigger=True)
+
+            return response
+        except Exception as e:
+            logger.error(f"Erro inesperado ao fechar ordem: {e}")
+            return None
+
     def update_price_continuously(self, symbol, frequency_per_second=1):
         interval = 1 / frequency_per_second
         while True:
@@ -151,3 +150,20 @@ class LiveData:
             except Exception as e:
                 logger.error(f"Erro ao atualizar o preço continuamente: {e}")
             time.sleep(interval)
+
+
+    def read_trade_history():
+        try:
+            # Define o caminho completo para o arquivo trade_history.csv dentro da pasta data
+            file_path = os.path.join('data', 'trade_history.csv')
+            
+            # Tenta ler o histórico de um arquivo CSV
+            df = pd.read_csv(file_path)
+            if df.empty:
+                logger.info("Histórico de transações vazio.")
+                return []
+            return df
+        except FileNotFoundError:
+            logger.warning("Arquivo de histórico de transações não encontrado, iniciando com histórico vazio.")
+            return []
+

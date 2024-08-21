@@ -60,9 +60,12 @@ def main_loop():
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
-    is_comprado_logged = False  # Inicializar variáveis de estado
+    is_comprado_logged = False
     is_not_comprado_logged = False
     last_log_time = time.time()
+
+    # Inicializa trade_history corretamente usando a função ajustada
+    trade_history = read_trade_history()
 
     price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 1))
     price_thread.daemon = True
@@ -92,11 +95,13 @@ def main_loop():
                 if current_time - last_log_time >= 120:
                     logger.info("Executando lógica de venda...")
                     last_log_time = current_time
+                # Passe trade_history para a lógica de venda
                 is_buy, trade_history = strategy.sell_logic(trade_history, current_time)
             else:
                 if current_time - last_log_time >= 120:
                     logger.info("Executando lógica de compra...")
                     last_log_time = current_time
+                # Passe trade_history para a lógica de compra
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
 
         except Exception as e:
@@ -105,3 +110,4 @@ def main_loop():
 
 if __name__ == "__main__":
     main_loop()
+

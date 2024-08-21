@@ -53,13 +53,11 @@ class TradingStrategy:
             if current_time - self.last_log_time >= 120:
                 logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
-            balance_asset = self.data_interface.get_current_balance(self.symbol.replace('USDT', ''))
-            lot_size = self.data_interface.get_lot_size(self.symbol)
+            balance_asset = self.data_interface.get_current_balance('USDT')
+            lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
             if balance_asset > 0 and lot_size:
-                quantity_to_sell = (balance_asset // lot_size) * lot_size
-                if quantity_to_sell > 0:
-                    quantity_to_sell = round(quantity_to_sell, 8)
-                    order = self.data_interface.create_order(self.symbol, 'Sell', quantity_to_sell)
+                if float(lot_size) > 0:
+                    order = self.data_interface.close_order(self.symbol)
                     if order is not None:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
@@ -118,20 +116,20 @@ class TradingStrategy:
             logger.info("Condições de compra atendidas, tentando executar compra...")
             start_time = time.time()
 
-           
+            
             balance_usdt = self.data_interface.get_current_balance('USDT')
+            print(balance_usdt)
             if balance_usdt > 0:
                 
-                quantity_to_buy = balance_usdt / current_price
-
+                quantity_to_buy = (balance_usdt / current_price) #* 0.998
+                truncated_quantity = int(quantity_to_buy * 1000) / 1000 #truncado do jeito que deu :)
+                print(truncated_quantity)
                 
-                lot_size = self.data_interface.get_lot_size(self.symbol)
+                lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
                 if lot_size:
-                    quantity_to_buy = (quantity_to_buy // lot_size) * lot_size
-                    quantity_to_buy = round(quantity_to_buy, 8)  
 
-                    if quantity_to_buy > 0:
-                        order = self.data_interface.create_order(self.symbol, 'Buy', quantity_to_buy)
+                    if truncated_quantity > 0:
+                        order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
                         if order is not None:
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
                             stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
@@ -143,7 +141,7 @@ class TradingStrategy:
                                 'moeda': [self.symbol],
                                 'valor_compra': [current_price],
                                 'valor_venda': [None],
-                                'quantidade_moeda': [quantity_to_buy],
+                                'quantidade_moeda': [truncated_quantity],
                                 'max_referencia': [data['high'].iloc[-2]],
                                 'min_referencia': [set_sell_stoploss_min_candles(data, stop_candles)],
                                 'stoploss': [stoploss],
