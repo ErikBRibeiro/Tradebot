@@ -76,7 +76,6 @@ class LiveData:
 
             # Extraia o preço corretamente
             ticker = float(response['result']['list'][0]['lastPrice'])
-            logger.info(f"Preço atual obtido: {ticker}")
             return ticker
         except Exception as e:
             logger.error(f"Erro inesperado ao obter preço atual: {e}")

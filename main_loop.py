@@ -22,7 +22,6 @@ def check_last_transaction(data_interface, symbol):
         size = float(position['size'])
 
         if size > 0:
-            logger.info(f"Posição aberta encontrada: {position['side']} com tamanho {size}")
             return True  # Já há uma posição long, não compra novamente
         else:
             logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
@@ -46,7 +45,6 @@ def check_open_position(data_interface, symbol):
         size = float(position['size'])
 
         if size > 0:
-            logger.info(f"Posição aberta encontrada: {side} com tamanho {size}")
             return side  # Retorna "Buy"
         else:
             return None  # Nenhuma posição relevante encontrada
