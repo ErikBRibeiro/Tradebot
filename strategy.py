@@ -31,24 +31,25 @@ class TradingStrategy:
         data['low'] = data['low'].apply(safe_float_conversion)
         data['high'] = data['high'].apply(safe_float_conversion)
 
-        # Log apenas a cada 1200 segundos
-        if current_time - self.last_log_time >= 1200:
-            ticker = self.data_interface.get_current_price(self.symbol)
-            if ticker is None:
-                logger.warning("Preço atual não obtido. Tentando novamente...")
-            else:
-                logger.info(f"Preço atual obtido: {ticker}")
+        ticker = self.data_interface.get_current_price(self.symbol)
+        if ticker is None:
+            logger.warning("Preço atual não obtido. Tentando novamente...")
+            return True, trade_history
 
+        # Certifique-se de que as variáveis stoploss e stopgain sejam sempre definidas
+        if not trade_history.empty:
             stoploss = trade_history['stoploss'].iloc[-1]
             stopgain = trade_history['stopgain'].iloc[-1]
-            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
-            self.last_log_time = current_time  # Atualiza o tempo do último log
         else:
-            ticker = self.data_interface.get_current_price(self.symbol)
-            if ticker is None:
-                return True, trade_history
+            logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
+            return True, trade_history
+
+        if current_time - self.last_log_time >= 120:
+            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
+            self.last_log_time = current_time
 
         if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
+            logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
             balance_asset = self.data_interface.get_current_balance('USDT')
             lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
@@ -69,12 +70,14 @@ class TradingStrategy:
                         return False, trade_history  
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
-            else:
-                logger.info("Saldo de ativo insuficiente para venda.")
-            self.position_maintained = False
-            return False, trade_history
+                else:
+                    logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
+                self.position_maintained = False
+                return False, trade_history
 
+        logger.info("Condições de venda não atendidas, mantendo posição.")
         return True, trade_history  
+
 
     def buy_logic(self, trade_history, current_time):
         if not self.position_maintained:
