@@ -36,16 +36,19 @@ class TradingStrategy:
             logger.warning("Preço atual não obtido. Tentando novamente...")
             return True, trade_history
 
-        # Certifique-se de que as variáveis stoploss e stopgain sejam sempre definidas
         if not trade_history.empty:
             stoploss = trade_history['stoploss'].iloc[-1]
             stopgain = trade_history['stopgain'].iloc[-1]
         else:
-            # Definir stoploss e stopgain com valores padrões ou retornar
             logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
+            stoploss = None
+            stopgain = None
+
+        if stoploss is None or stopgain is None:
+            logger.info("Venda não realizada devido à falta de stoploss e stopgain.")
             return True, trade_history
 
-        if current_time - self.last_log_time >= 120:
+        if current_time - self.last_log_time >= 1200:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
             self.last_log_time = current_time
 
@@ -76,7 +79,9 @@ class TradingStrategy:
             self.position_maintained = False
             return False, trade_history
 
-        logger.info("Condições de venda não atendidas, mantendo posição.")
+        if current_time - self.last_log_time >= 1200:
+            logger.info("Condições de venda não atendidas, mantendo posição.")
+            self.last_log_time = current_time
         return True, trade_history  
 
     def buy_logic(self, trade_history, current_time):
@@ -102,12 +107,8 @@ class TradingStrategy:
 
         current_price = data['close'].iloc[-1]
 
-        # Log apenas a cada 120 segundos, se for necessário
-        if current_time - self.last_log_time >= 120:
-            logger.info(f"Condições de compra atendidas, tentando executar compra... Preço atual: {current_price}")
-            self.last_log_time = current_time  # Atualiza o tempo do último log
-
         if buy_double_ema_breakout(data, f'EMA_{short_period}', f'EMA_{long_period}'):
+            logger.info("Condições de compra atendidas, tentando executar compra...")
             start_time = time.time()
 
             balance_usdt = self.data_interface.get_current_balance('USDT')
@@ -163,4 +164,7 @@ class TradingStrategy:
             else:
                 logger.error("Saldo insuficiente em USDT para realizar a compra.")
 
+        if current_time - self.last_log_time >= 1200:
+            logger.info("Condições de compra não atendidas.")
+            self.last_log_time = current_time
         return False, trade_history
