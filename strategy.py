@@ -50,8 +50,9 @@ class TradingStrategy:
 
         if current_time - self.last_log_time >= 2:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
+            print('COMEÇO')
             print(data.iloc[-1])
-            print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+            print('FIM')
             self.last_log_time = current_time
 
         if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
