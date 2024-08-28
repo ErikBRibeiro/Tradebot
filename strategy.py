@@ -68,10 +68,12 @@ class TradingStrategy:
                         outcome = "Stoploss" if sell_stoploss(data['low'].iloc[-1], stoploss) else "Stopgain"
                         logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
 
-                        trade_history = update_trade_history(trade_history, ticker)  
+                        self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)  # Adicionando o resultado da transação
+
+                        trade_history = update_trade_history(trade_history, ticker)
                         self.metrics.update_metrics_on_sell(ticker, self.symbol)
                         self.position_maintained = False
-                        return False, trade_history  
+                        return False, trade_history
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
             else:
@@ -123,6 +125,9 @@ class TradingStrategy:
                     if truncated_quantity > 0:
                         order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
                         if order is not None:
+                            trade_duration = time.time() - start_time
+                            self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)  # Registrando a duração da compra
+
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
                             stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
                             potential_loss = calculate_loss_percentage(current_price, stoploss)
@@ -157,14 +162,3 @@ class TradingStrategy:
                             logger.error("Erro ao tentar criar a ordem de compra.")
                             self.position_maintained = False
                             return False, trade_history
-                    else:
-                        logger.error("Quantidade calculada para compra é menor que o tamanho do lote.")
-                else:
-                    logger.error("Tamanho do lote não encontrado para o símbolo.")
-            else:
-                logger.error("Saldo insuficiente em USDT para realizar a compra.")
-
-        if current_time - self.last_log_time >= 1200:
-            logger.info("Condições de compra não atendidas.")
-            self.last_log_time = current_time
-        return False, trade_history
