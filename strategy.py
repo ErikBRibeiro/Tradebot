@@ -51,7 +51,7 @@ class TradingStrategy:
         if current_time - self.last_log_time >= 20:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
             logger.info("COMEÇO")
-            logger.info(f"{data.iloc[-1]}")
+            logger.info(f"{data.iloc[-2]}")
             logger.info("FIM")
             self.last_log_time = current_time
 
