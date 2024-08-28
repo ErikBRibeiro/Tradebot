@@ -48,9 +48,11 @@ class TradingStrategy:
             logger.info("Venda não realizada devido à falta de stoploss e stopgain.")
             return True, trade_history
 
-        if current_time - self.last_log_time >= 1200:
+        if current_time - self.last_log_time >= 2:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
             self.last_log_time = current_time
+            print(data['low'].iloc[-1])
+            print('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 
         if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
             logger.info("Condições de venda atendidas, tentando executar venda...")
