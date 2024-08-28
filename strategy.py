@@ -50,12 +50,9 @@ class TradingStrategy:
 
         if current_time - self.last_log_time >= 20:
             logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
-            logger.info("COMEÇO")
-            logger.info(f"{data.iloc[0]}")
-            logger.info("FIM")
             self.last_log_time = current_time
 
-        if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
+        if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
             logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
             balance_asset = self.data_interface.get_current_balance('USDT')
@@ -68,7 +65,7 @@ class TradingStrategy:
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
                         self.metrics.total_trade_duration += trade_duration
 
-                        outcome = "Stoploss" if sell_stoploss(data['low'].iloc[-1], stoploss) else "Stopgain"
+                        outcome = "Stoploss" if sell_stoploss(data['low'].iloc[0], stoploss) else "Stopgain"
                         logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
 
                         self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)  # Adicionando o resultado da transação
@@ -110,7 +107,7 @@ class TradingStrategy:
             logger.error("Dados corrompidos recebidos da API Bybit.")
             return False, trade_history
 
-        current_price = data['close'].iloc[-1]
+        current_price = data['close'].iloc[0]
 
         if buy_double_ema_breakout(data, f'EMA_{short_period}', f'EMA_{long_period}'):
             logger.info("Condições de compra atendidas, tentando executar compra...")
@@ -132,7 +129,7 @@ class TradingStrategy:
                             self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)  # Registrando a duração da compra
 
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
-                            stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
+                            stopgain = set_sell_stopgain_ratio(data['close'].iloc[0], stoploss, ratio)
                             potential_loss = calculate_loss_percentage(current_price, stoploss)
                             potential_gain = calculate_gain_percentage(current_price, stopgain)
 
