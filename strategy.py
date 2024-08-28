@@ -49,7 +49,7 @@ class TradingStrategy:
             return True, trade_history
 
         if current_time - self.last_log_time >= 20:
-            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
+            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]} ")
             self.last_log_time = current_time
 
         if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
