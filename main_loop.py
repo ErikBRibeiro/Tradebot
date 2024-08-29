@@ -3,33 +3,31 @@ import time
 from config import API_KEY, API_SECRET
 from data_interface import LiveData
 from strategy import TradingStrategy
-from metrics import Metrics, start_prometheus_server
+from metrics import Metrics, start_prometheus_server, server_status_metric, server_down_metric_duration
 from src.utils import read_trade_history, logger
-from src.parameters import ativo, timeframe, setup  
+from src.parameters import ativo, timeframe, setup
+
+start_prometheus_server()
 
 def check_last_transaction(data_interface, symbol):
     try:
-        # Obtém a posição atual
         response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
         
-        # Verifique se a resposta contém resultados
         if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
             logger.info("Nenhuma posição encontrada. Considerando executar uma compra...")
-            return False  # Nenhuma transação anterior, pode comprar
+            return False
         
-        # Obtém a posição e verifica o tamanho
         position = response['result']['list'][0]
         size = float(position['size'])
 
         if size > 0:
-            return True  # Já há uma posição long, não compra novamente
+            return True
         else:
             logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
-            return False  # Não há posição ativa, pode comprar
+            return False
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
         return False
-
 
 def check_open_position(data_interface, symbol):
     try:
@@ -37,28 +35,25 @@ def check_open_position(data_interface, symbol):
         
         if not response or 'result' not in response or len(response['result']) == 0:
             logger.info("Nenhuma posição aberta encontrada.")
-            return None  # Nenhuma posição aberta
+            return None
         
-        # Verifica a posição aberta
         position = response['result'][0]
-        side = position['side']  # "Buy" para long
+        side = position['side']
         size = float(position['size'])
 
         if size > 0:
-            return side  # Retorna "Buy"
+            return side
         else:
-            return None  # Nenhuma posição relevante encontrada
+            return None
     except Exception as e:
         logger.error(f"Erro ao verificar posição aberta: {e}")
         return None
-
 
 def main_loop():
     metrics = Metrics(ativo)  
     data_interface = LiveData(API_KEY, API_SECRET)
     strategy = TradingStrategy(data_interface, metrics, ativo, timeframe, setup)
 
-    # Log para indicar que o bot foi iniciado
     logger.info("SandsBot Bybit iniciado")
 
     is_comprado_logged = False
@@ -77,6 +72,8 @@ def main_loop():
             is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
 
+            server_status_metric.set(1)
+
             if is_buy and not is_comprado_logged:
                 logger.info("Bot v2 iniciado - Loop de venda.")
                 is_comprado_logged = True
@@ -93,8 +90,12 @@ def main_loop():
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
 
         except Exception as e:
+            server_status_metric.set(0)
+            offline_start = time.time()
             logger.error(f"Erro inesperado: {e}")
             time.sleep(25)
+            offline_duration = time.time() - offline_start
+            server_down_metric_duration.observe(offline_duration)
 
 if __name__ == "__main__":
     main_loop()
