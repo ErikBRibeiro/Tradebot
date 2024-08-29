@@ -28,11 +28,11 @@ class LiveData:
 
     def get_historical_data(self, symbol, interval, limit=150):
         try:
-            if self.futures:
-                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
-            else:
-                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
-
+            response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
+            
+            if response is None or 'result' not in response:
+                logger.error("Resposta inválida ao obter dados históricos.")
+                return None
 
             data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
@@ -56,40 +56,29 @@ class LiveData:
 
     def get_current_price(self, symbol):
         try:
-            if self.futures:
-                response = self.client.get_tickers(symbol=symbol, category='linear')
-            else:
-                response = self.client.get_tickers(symbol=symbol, category='linear')
+            response = self.client.get_tickers(symbol=symbol, category='linear')
 
-            # Loga a resposta bruta para verificar o conteúdo
-            #logger.info(f"Resposta da API ao obter preço: {response}")
-
-            # Verifique se 'result' existe e não está vazio
-            if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
+            if response is None or 'result' not in response or len(response['result']['list']) == 0:
                 logger.error(f"Erro ao obter preço: resposta inválida ou vazia.")
                 return 0  # Retorna 0 em caso de erro
 
-            # Verifique o conteúdo do primeiro resultado
             if 'lastPrice' not in response['result']['list'][0]:
                 logger.error(f"Erro ao obter preço: campo 'lastPrice' não encontrado.")
                 return 0  # Retorna 0 se o campo não for encontrado
 
-            # Extraia o preço corretamente
             ticker = float(response['result']['list'][0]['lastPrice'])
             return ticker
         except Exception as e:
             logger.error(f"Erro inesperado ao obter preço atual: {e}")
             return 0
 
-
-
-
     def get_current_balance(self, asset):
         try:
-            if self.futures:
-                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
-            else:
-                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
+            response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
+
+            if response is None or 'result' not in response:
+                logger.error(f"Erro ao obter saldo: resposta inválida ou vazia.")
+                return 0.0
 
             return float(response['result']['list'][0]['totalEquity'])
         except Exception as e:
@@ -99,8 +88,13 @@ class LiveData:
     def get_lot_size(self, symbol, data_interface):
         try:
             response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
-            response = response['result']['list'][0]['size']
-            return response
+            
+            if response is None or 'result' not in response or len(response['result']['list']) == 0:
+                logger.error(f"Erro ao obter LOT_SIZE: resposta inválida ou vazia.")
+                return None
+            
+            lot_size = response['result']['list'][0]['size']
+            return lot_size
 
         except Exception as e:
             logger.error(f"Erro inesperado ao obter LOT_SIZE: {e}")
@@ -117,13 +111,14 @@ class LiveData:
                 if side.lower() == 'buy':
                     response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
                 elif side.lower() == 'sell':
-                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Sell', orderType="Market", qty=quantity)
                 else:
                     logger.error(f"Tipo de ordem não reconhecido: {side}")
                     return None
 
-            # Check rate limit from headers
-            #self.check_rate_limit(response.headers)
+            if response is None or 'result' not in response:
+                logger.error(f"Erro ao criar ordem: resposta inválida ou vazia.")
+                return None
 
             return response
         except Exception as e:
@@ -133,6 +128,10 @@ class LiveData:
     def close_order(self, symbol):
         try:
             response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Sell', orderType="Market", qty=0, reduceOnly=True, closeOnTrigger=True)
+
+            if response is None or 'result' not in response:
+                logger.error(f"Erro ao fechar ordem: resposta inválida ou vazia.")
+                return None
 
             return response
         except Exception as e:
@@ -148,13 +147,9 @@ class LiveData:
                 logger.error(f"Erro ao atualizar o preço continuamente: {e}")
             time.sleep(interval)
 
-
     def read_trade_history():
         try:
-            # Define o caminho completo para o arquivo trade_history.csv dentro da pasta data
             file_path = os.path.join('data', 'trade_history.csv')
-            
-            # Tenta ler o histórico de um arquivo CSV
             df = pd.read_csv(file_path)
             if df.empty:
                 logger.info("Histórico de transações vazio.")
@@ -163,4 +158,6 @@ class LiveData:
         except FileNotFoundError:
             logger.warning("Arquivo de histórico de transações não encontrado, iniciando com histórico vazio.")
             return []
-
+        except Exception as e:
+            logger.error(f"Erro inesperado ao ler histórico de transações: {e}")
+            return []
