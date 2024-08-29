@@ -69,7 +69,7 @@ class TradingStrategy:
                             outcome = "Stoploss" if sell_stoploss(data['low'].iloc[0], stoploss) else "Stopgain"
                             logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
 
-                            self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)  # Adicionando o resultado da transação
+                            self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)
 
                             trade_history = update_trade_history(trade_history, ticker)
                             self.metrics.update_metrics_on_sell(ticker, self.symbol)
@@ -88,7 +88,7 @@ class TradingStrategy:
             return True, trade_history  
         except Exception as e:
             logger.error(f"Erro em sell_logic: {e}")
-            return False, trade_history  # Retorno padrão em caso de exceção
+            return False, trade_history
 
     def buy_logic(self, trade_history, current_time):
         try:
@@ -133,7 +133,7 @@ class TradingStrategy:
                             order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
                             if order is not None:
                                 trade_duration = time.time() - start_time
-                                self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)  # Registrando a duração da compra
+                                self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)
 
                                 stoploss = set_sell_stoploss_min_candles(data, stop_candles)
                                 stopgain = set_sell_stopgain_ratio(data['close'].iloc[0], stoploss, ratio)
@@ -171,5 +171,4 @@ class TradingStrategy:
                                 return False, trade_history
         except Exception as e:
             logger.error(f"Erro em buy_logic: {e}")
-            return False, trade_history  # Retorno padrão em caso de exceção
-
+            return False, trade_history
