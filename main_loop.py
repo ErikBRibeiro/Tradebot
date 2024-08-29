@@ -72,7 +72,7 @@ def main_loop():
             is_buy = check_last_transaction(data_interface, ativo)
             metrics.loop_counter_metric.labels(ativo).inc()
 
-            server_status_metric.set(1)
+            metrics.server_status_metric.set(1)
 
             if is_buy and not is_comprado_logged:
                 logger.info("Bot v2 iniciado - Loop de venda.")
@@ -90,12 +90,12 @@ def main_loop():
                 is_buy, trade_history = strategy.buy_logic(trade_history, current_time)
 
         except Exception as e:
-            server_status_metric.set(0)
+            metrics.server_status_metric.set(0)
             offline_start = time.time()
             logger.error(f"Erro inesperado: {e}")
             time.sleep(25)
             offline_duration = time.time() - offline_start
-            server_down_metric_duration.observe(offline_duration)
+            metrics.server_down_metric_duration.observe(offline_duration)
 
 if __name__ == "__main__":
     main_loop()
