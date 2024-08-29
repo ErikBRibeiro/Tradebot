@@ -19,22 +19,18 @@ class TradingStrategy:
         self.last_log_time = time.time()
 
     def sell_logic(self, trade_history, current_time):
-        logger.info("Entrando em sell_logic")
         try:
             if not self.position_maintained:
-                logger.info("Loop de venda - Checando condições de venda.")
                 self.position_maintained = True
 
             # Verifica se ainda há uma posição aberta antes de tentar vender
             open_position = self.data_interface.client.get_positions(symbol=self.symbol, category='linear')
             if open_position is None or 'result' not in open_position or not open_position['result']['list'] or open_position['result']['list'][0]['size'] == '0':
-                logger.info("Nenhuma posição aberta detectada. Iniciando loop de compra.")
                 self.position_maintained = False
                 return False, trade_history  # Inicia o ciclo de compra
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
             if klines is None or 'result' not in klines or 'list' not in klines['result'] or not klines['result']['list']:
-                logger.error("Erro: klines retornou None ou dados inválidos")
                 return False, trade_history
 
             candles = klines['result']['list']
@@ -44,36 +40,31 @@ class TradingStrategy:
 
             ticker = self.data_interface.get_current_price(self.symbol)
             if ticker == 0:
-                logger.warning("Preço atual não obtido. Tentando novamente...")
                 return True, trade_history
 
             if not trade_history.empty:
                 stoploss = trade_history.get('stoploss').iloc[-1] if 'stoploss' in trade_history else None
                 stopgain = trade_history.get('stopgain').iloc[-1] if 'stopgain' in trade_history else None
             else:
-                logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
                 stoploss = None
                 stopgain = None
 
             if stoploss is None or stopgain is None:
-                logger.info("Venda não realizada devido à falta de stoploss e stopgain.")
                 return True, trade_history
 
-            if current_time - self.last_log_time >= 1200:
-                logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]} ")
+            # Emitir um log a cada 10 minutos
+            if current_time - self.last_log_time >= 600:  # 600 segundos = 10 minutos
+                logger.info(f"Verificando condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]}")
                 self.last_log_time = current_time
 
             if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
-                logger.info("Condições de venda atendidas, tentando executar venda...")
                 start_time = time.time()
                 balance_asset = self.data_interface.get_current_balance('USDT')
                 if balance_asset <= 0:
-                    logger.error("Erro: Saldo insuficiente.")
                     return False, trade_history
 
                 lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
                 if lot_size is None or float(lot_size) <= 0:
-                    logger.error("Erro: Tamanho do lote inválido.")
                     return False, trade_history
 
                 order = self.data_interface.close_order(self.symbol)
@@ -90,29 +81,22 @@ class TradingStrategy:
                     trade_history = update_trade_history(trade_history, ticker)
                     self.metrics.update_metrics_on_sell(ticker, self.symbol)
                     self.position_maintained = False
-                    logger.info("Saindo de sell_logic com retorno (False, trade_history)")
                     return False, trade_history
                 else:
-                    logger.error("Erro ao tentar criar a ordem de venda.")
                     return False, trade_history
 
-            logger.info("Condições de venda não atendidas, mantendo posição.")
-            self.last_log_time = current_time
             return True, trade_history  
         except Exception as e:
             logger.error(f"Erro em sell_logic: {e}")
             return False, trade_history
 
     def buy_logic(self, trade_history, current_time):
-        logger.info("Entrando em buy_logic")
         try:
             if not self.position_maintained:
-                logger.info("Loop de compra - Checando condições de compra.")
                 self.position_maintained = True
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
             if klines is None or 'result' not in klines or 'list' not in klines['result'] or not klines['result']['list']:
-                logger.error("Erro: klines retornou None ou dados inválidos")
                 return False, trade_history
 
             candles = klines['result']['list']
@@ -126,18 +110,15 @@ class TradingStrategy:
             data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
-                logger.error("Dados corrompidos recebidos da API Bybit.")
                 return False, trade_history
 
             current_price = data['close'].iloc[0]
 
             if buy_double_ema_breakout(data, f'EMA_{short_period}', f'EMA_{long_period}'):
-                logger.info("Condições de compra atendidas, tentando executar compra...")
                 start_time = time.time()
 
                 balance_usdt = self.data_interface.get_current_balance('USDT')
                 if balance_usdt <= 0:
-                    logger.error("Erro: Saldo insuficiente em USDT.")
                     return False, trade_history
 
                 quantity_to_buy = (balance_usdt / current_price)
@@ -145,7 +126,6 @@ class TradingStrategy:
 
                 lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
                 if lot_size is None or truncated_quantity <= 0:
-                    logger.error("Erro: Quantidade de compra ou tamanho do lote inválido.")
                     return False, trade_history
 
                 order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
@@ -177,18 +157,20 @@ class TradingStrategy:
                         'outcome': [None]
                     })
                     trade_history = pd.concat([trade_history, new_row], ignore_index=True)
-                    logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
                     trade_history.to_csv('data/trade_history.csv', index=False)
                     self.metrics.buy_prices.append(current_price)
                     self.metrics.update_metrics_on_buy(self.symbol, current_price, stoploss, stopgain, potential_loss, potential_gain)
                     self.position_maintained = False
                     return True, trade_history
                 else:
-                    logger.error("Erro ao tentar criar a ordem de compra.")
                     return False, trade_history
-            else:
+
+            # Emitir um log a cada 10 minutos
+            if current_time - self.last_log_time >= 600:  # 600 segundos = 10 minutos
                 logger.info("Condições de compra não atendidas, mantendo posição.")
-                return True, trade_history
+                self.last_log_time = current_time
+
+            return True, trade_history
         except Exception as e:
             logger.error(f"Erro em buy_logic: {e}")
             return False, trade_history
