@@ -120,6 +120,8 @@ class TradingStrategy:
                 truncated_quantity = int(quantity_to_buy * 1000) / 1000  # Truncado para 3 casas decimais
                 
                 lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
+                logger.info(f"quantity_to_buy: {quantity_to_buy}, truncated_quantity: {truncated_quantity}, lot_size:{lot_size}")
+                
                 if lot_size:
 
                     if truncated_quantity > 0:
