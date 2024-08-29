@@ -18,7 +18,8 @@ class TradingStrategy:
         self.position_maintained = False
         self.last_log_time = time.time()
 
-    def sell_logic(self, trade_history, current_time):
+def sell_logic(self, trade_history, current_time):
+    try:
         if not self.position_maintained:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
@@ -85,8 +86,12 @@ class TradingStrategy:
             logger.info("Condições de venda não atendidas, mantendo posição.")
             self.last_log_time = current_time
         return True, trade_history  
+    except Exception as e:
+        logger.error(f"Erro em sell_logic: {e}")
+        return False, trade_history  # Retorno padrão em caso de exceção
 
-    def buy_logic(self, trade_history, current_time):
+def buy_logic(self, trade_history, current_time):
+    try:
         if not self.position_maintained:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
@@ -164,3 +169,7 @@ class TradingStrategy:
                             logger.error("Erro ao tentar criar a ordem de compra.")
                             self.position_maintained = False
                             return False, trade_history
+    except Exception as e:
+        logger.error(f"Erro em buy_logic: {e}")
+        return False, trade_history  # Retorno padrão em caso de exceção
+
