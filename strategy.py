@@ -27,21 +27,17 @@ class TradingStrategy:
 
             # Verifica se ainda há uma posição aberta antes de tentar vender
             open_position = self.data_interface.client.get_positions(symbol=self.symbol, category='linear')
-            if not open_position or open_position['result']['list'][0]['size'] == '0':
+            if open_position is None or 'result' not in open_position or not open_position['result']['list'] or open_position['result']['list'][0]['size'] == '0':
                 logger.info("Nenhuma posição aberta detectada. Iniciando loop de compra.")
                 self.position_maintained = False
                 return False, trade_history  # Inicia o ciclo de compra
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-            if klines is None:
-                logger.error("Erro: klines retornou None")
+            if klines is None or 'result' not in klines or 'list' not in klines['result'] or not klines['result']['list']:
+                logger.error("Erro: klines retornou None ou dados inválidos")
                 return False, trade_history
 
-            candles = klines.get('result', {}).get('list', [])
-            if not candles:
-                logger.error("Erro: candles retornou lista vazia")
-                return False, trade_history
-            
+            candles = klines['result']['list']
             data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
@@ -52,8 +48,8 @@ class TradingStrategy:
                 return True, trade_history
 
             if not trade_history.empty:
-                stoploss = trade_history['stoploss'].iloc[-1]
-                stopgain = trade_history['stopgain'].iloc[-1]
+                stoploss = trade_history.get('stoploss').iloc[-1] if 'stoploss' in trade_history else None
+                stopgain = trade_history.get('stopgain').iloc[-1] if 'stopgain' in trade_history else None
             else:
                 logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
                 stoploss = None
@@ -71,41 +67,40 @@ class TradingStrategy:
                 logger.info("Condições de venda atendidas, tentando executar venda...")
                 start_time = time.time()
                 balance_asset = self.data_interface.get_current_balance('USDT')
+                if balance_asset <= 0:
+                    logger.error("Erro: Saldo insuficiente.")
+                    return False, trade_history
+
                 lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
-                if balance_asset > 0 and lot_size:
-                    if float(lot_size) > 0:
-                        order = self.data_interface.close_order(self.symbol)
-                        if order is not None:
-                            trade_duration = time.time() - start_time
-                            self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
-                            self.metrics.total_trade_duration += trade_duration
+                if lot_size is None or float(lot_size) <= 0:
+                    logger.error("Erro: Tamanho do lote inválido.")
+                    return False, trade_history
 
-                            outcome = "Stoploss" if sell_stoploss(data['low'].iloc[0], stoploss) else "Stopgain"
-                            logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
+                order = self.data_interface.close_order(self.symbol)
+                if order is not None:
+                    trade_duration = time.time() - start_time
+                    self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
+                    self.metrics.total_trade_duration += trade_duration
 
-                            self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)
+                    outcome = "Stoploss" if sell_stoploss(data['low'].iloc[0], stoploss) else "Stopgain"
+                    logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
 
-                            trade_history = update_trade_history(trade_history, ticker)
-                            self.metrics.update_metrics_on_sell(ticker, self.symbol)
-                            self.position_maintained = False
-                            logger.info("Saindo de sell_logic com retorno (False, trade_history)")
-                            return False, trade_history
-                        else:
-                            logger.error("Erro ao tentar criar a ordem de venda.")
+                    self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)
+
+                    trade_history = update_trade_history(trade_history, ticker)
+                    self.metrics.update_metrics_on_sell(ticker, self.symbol)
+                    self.position_maintained = False
+                    logger.info("Saindo de sell_logic com retorno (False, trade_history)")
+                    return False, trade_history
                 else:
-                    logger.info("Saldo de ativo insuficiente para venda.")
-                self.position_maintained = False
-                logger.info("Saindo de sell_logic com retorno (False, trade_history)")
-                return False, trade_history
+                    logger.error("Erro ao tentar criar a ordem de venda.")
+                    return False, trade_history
 
-            if current_time - self.last_log_time >= 1200:
-                logger.info("Condições de venda não atendidas, mantendo posição.")
-                self.last_log_time = current_time
-            logger.info("Saindo de sell_logic com retorno (True, trade_history)")
+            logger.info("Condições de venda não atendidas, mantendo posição.")
+            self.last_log_time = current_time
             return True, trade_history  
         except Exception as e:
             logger.error(f"Erro em sell_logic: {e}")
-            logger.info("Saindo de sell_logic com retorno (False, trade_history) devido a erro")
             return False, trade_history
 
     def buy_logic(self, trade_history, current_time):
@@ -116,15 +111,11 @@ class TradingStrategy:
                 self.position_maintained = True
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-            if klines is None:
-                logger.error("Erro: klines retornou None")
+            if klines is None or 'result' not in klines or 'list' not in klines['result'] or not klines['result']['list']:
+                logger.error("Erro: klines retornou None ou dados inválidos")
                 return False, trade_history
 
-            candles = klines.get('result', {}).get('list', [])
-            if not candles:
-                logger.error("Erro: candles retornou lista vazia")
-                return False, trade_history
-            
+            candles = klines['result']['list']
             data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
@@ -136,7 +127,6 @@ class TradingStrategy:
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
                 logger.error("Dados corrompidos recebidos da API Bybit.")
-                logger.info("Saindo de buy_logic com retorno (False, trade_history)")
                 return False, trade_history
 
             current_price = data['close'].iloc[0]
@@ -146,56 +136,59 @@ class TradingStrategy:
                 start_time = time.time()
 
                 balance_usdt = self.data_interface.get_current_balance('USDT')
-                if balance_usdt > 0:
-                    
-                    quantity_to_buy = (balance_usdt / current_price)
-                    truncated_quantity = int(quantity_to_buy * 1000) / 1000  # Truncado para 3 casas decimais
-                    
-                    lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
-                    logger.info(f"quantity_to_buy: {quantity_to_buy}, truncated_quantity: {truncated_quantity}, lot_size:{lot_size}")
-                    
-                    if lot_size:
+                if balance_usdt <= 0:
+                    logger.error("Erro: Saldo insuficiente em USDT.")
+                    return False, trade_history
 
-                        if truncated_quantity > 0:
-                            order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
-                            if order is not None:
-                                trade_duration = time.time() - start_time
-                                self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)
+                quantity_to_buy = (balance_usdt / current_price)
+                truncated_quantity = int(quantity_to_buy * 1000) / 1000  # Truncado para 3 casas decimais
 
-                                stoploss = set_sell_stoploss_min_candles(data, stop_candles)
-                                stopgain = set_sell_stopgain_ratio(data['close'].iloc[0], stoploss, ratio)
-                                potential_loss = calculate_loss_percentage(current_price, stoploss)
-                                potential_gain = calculate_gain_percentage(current_price, stopgain)
+                lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
+                if lot_size is None or truncated_quantity <= 0:
+                    logger.error("Erro: Quantidade de compra ou tamanho do lote inválido.")
+                    return False, trade_history
 
-                                logger.info(f"Compra realizada! Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Potential Gain: {potential_gain}%, Potential Loss: {potential_loss}%")
+                order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
+                if order is not None:
+                    trade_duration = time.time() - start_time
+                    self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)
 
-                                new_row = pd.DataFrame({
-                                    'horario': [datetime.now()],
-                                    'moeda': [self.symbol],
-                                    'valor_compra': [current_price],
-                                    'valor_venda': [None],
-                                    'quantidade_moeda': [truncated_quantity],
-                                    'max_referencia': [data['high'].iloc[-2]],
-                                    'min_referencia': [set_sell_stoploss_min_candles(data, stop_candles)],
-                                    'stoploss': [stoploss],
-                                    'stopgain': [stopgain],
-                                    'potential_loss': [potential_loss],
-                                    'potential_gain': [potential_gain],
-                                    'timeframe': [self.interval],
-                                    'setup': [self.setup],
-                                    'outcome': [None]
-                                })
-                                trade_history = pd.concat([trade_history, new_row], ignore_index=True)
-                                logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
-                                trade_history.to_csv('data/trade_history.csv', index=False)
-                                self.metrics.buy_prices.append(current_price)
-                                self.metrics.update_metrics_on_buy(self.symbol, current_price, stoploss, stopgain, potential_loss, potential_gain)
-                                self.position_maintained = False
-                                return True, trade_history
-                            else:
-                                logger.error("Erro ao tentar criar a ordem de compra.")
-                                self.position_maintained = False
-                                return False, trade_history
+                    stoploss = set_sell_stoploss_min_candles(data, stop_candles)
+                    stopgain = set_sell_stopgain_ratio(data['close'].iloc[0], stoploss, ratio)
+                    potential_loss = calculate_loss_percentage(current_price, stoploss)
+                    potential_gain = calculate_gain_percentage(current_price, stopgain)
+
+                    logger.info(f"Compra realizada! Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Potential Gain: {potential_gain}%, Potential Loss: {potential_loss}%")
+
+                    new_row = pd.DataFrame({
+                        'horario': [datetime.now()],
+                        'moeda': [self.symbol],
+                        'valor_compra': [current_price],
+                        'valor_venda': [None],
+                        'quantidade_moeda': [truncated_quantity],
+                        'max_referencia': [data['high'].iloc[-2]],
+                        'min_referencia': [set_sell_stoploss_min_candles(data, stop_candles)],
+                        'stoploss': [stoploss],
+                        'stopgain': [stopgain],
+                        'potential_loss': [potential_loss],
+                        'potential_gain': [potential_gain],
+                        'timeframe': [self.interval],
+                        'setup': [self.setup],
+                        'outcome': [None]
+                    })
+                    trade_history = pd.concat([trade_history, new_row], ignore_index=True)
+                    logger.info(f"Histórico de negociações atualizado com nova compra. Linhas: {len(trade_history)}")
+                    trade_history.to_csv('data/trade_history.csv', index=False)
+                    self.metrics.buy_prices.append(current_price)
+                    self.metrics.update_metrics_on_buy(self.symbol, current_price, stoploss, stopgain, potential_loss, potential_gain)
+                    self.position_maintained = False
+                    return True, trade_history
+                else:
+                    logger.error("Erro ao tentar criar a ordem de compra.")
+                    return False, trade_history
+            else:
+                logger.info("Condições de compra não atendidas, mantendo posição.")
+                return True, trade_history
         except Exception as e:
             logger.error(f"Erro em buy_logic: {e}")
             return False, trade_history
