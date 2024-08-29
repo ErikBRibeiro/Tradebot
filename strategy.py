@@ -19,10 +19,18 @@ class TradingStrategy:
         self.last_log_time = time.time()
 
     def sell_logic(self, trade_history, current_time):
+        logger.info("Entrando em sell_logic")
         try:
             if not self.position_maintained:
                 logger.info("Loop de venda - Checando condições de venda.")
                 self.position_maintained = True
+
+            # Verifica se ainda há uma posição aberta antes de tentar vender
+            open_position = self.data_interface.client.get_positions(symbol=self.symbol, category='linear')
+            if not open_position or open_position['result']['list'][0]['size'] == '0':
+                logger.info("Nenhuma posição aberta detectada. Iniciando loop de compra.")
+                self.position_maintained = False
+                return False, trade_history  # Inicia o ciclo de compra
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
             candles = klines['result']['list']
@@ -74,23 +82,28 @@ class TradingStrategy:
                             trade_history = update_trade_history(trade_history, ticker)
                             self.metrics.update_metrics_on_sell(ticker, self.symbol)
                             self.position_maintained = False
+                            logger.info("Saindo de sell_logic com retorno (False, trade_history)")
                             return False, trade_history
                         else:
                             logger.error("Erro ao tentar criar a ordem de venda.")
                 else:
                     logger.info("Saldo de ativo insuficiente para venda.")
                 self.position_maintained = False
+                logger.info("Saindo de sell_logic com retorno (False, trade_history)")
                 return False, trade_history
 
             if current_time - self.last_log_time >= 1200:
                 logger.info("Condições de venda não atendidas, mantendo posição.")
                 self.last_log_time = current_time
+            logger.info("Saindo de sell_logic com retorno (True, trade_history)")
             return True, trade_history  
         except Exception as e:
             logger.error(f"Erro em sell_logic: {e}")
+            logger.info("Saindo de sell_logic com retorno (False, trade_history) devido a erro")
             return False, trade_history
 
     def buy_logic(self, trade_history, current_time):
+        logger.info("Entrando em buy_logic")
         try:
             if not self.position_maintained:
                 logger.info("Loop de compra - Checando condições de compra.")
@@ -110,6 +123,7 @@ class TradingStrategy:
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
                 logger.error("Dados corrompidos recebidos da API Bybit.")
+                logger.info("Saindo de buy_logic com retorno (False, trade_history)")
                 return False, trade_history
 
             current_price = data['close'].iloc[0]
