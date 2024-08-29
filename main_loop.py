@@ -13,7 +13,7 @@ def check_last_transaction(data_interface, symbol):
     try:
         response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
         
-        if response is None or 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
+        if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
             logger.info("Nenhuma posição encontrada. Considerando executar uma compra...")
             return False
         
@@ -33,7 +33,7 @@ def check_open_position(data_interface, symbol):
     try:
         response = data_interface.client.get_positions(symbol=symbol)
         
-        if response is None or 'result' not in response or len(response['result']) == 0:
+        if not response or 'result' not in response or len(response['result']) == 0:
             logger.info("Nenhuma posição aberta encontrada.")
             return None
         
@@ -58,11 +58,9 @@ def main_loop():
 
     is_comprado_logged = False
     is_not_comprado_logged = False
+    last_log_time = time.time()
 
     trade_history = read_trade_history()
-    if trade_history is None:
-        logger.error("Erro: Não foi possível ler o histórico de transações. trade_history é None.")
-        trade_history = []
 
     price_thread = threading.Thread(target=data_interface.update_price_continuously, args=(ativo, 1))
     price_thread.daemon = True
@@ -77,13 +75,19 @@ def main_loop():
 
             metrics.server_status_metric.set(1)
 
+            # Emitir um log a cada 10 minutos
+            if current_time - last_log_time >= 600:  # 600 segundos = 10 minutos
+                if is_buy:
+                    logger.info("Sandsbot está em loop de venda.")
+                else:
+                    logger.info("Sandsbot está em loop de compra.")
+                last_log_time = current_time
+
             if is_buy and not is_comprado_logged:
-                logger.info("Bot v2 iniciado - Loop de venda.")
                 is_comprado_logged = True
                 is_not_comprado_logged = False
 
             if not is_buy and not is_not_comprado_logged:
-                logger.info("Bot v2 iniciado - Loop de compra.")
                 is_not_comprado_logged = True
                 is_comprado_logged = False
 
@@ -96,16 +100,12 @@ def main_loop():
                 logger.error("Erro: A função de lógica retornou None.")
                 continue
 
-            if not isinstance(result, tuple) or len(result) != 2:
-                logger.error(f"Erro: Resultado inesperado da lógica. Esperado um tuple de dois elementos, mas obtido {type(result)} com {len(result) if isinstance(result, tuple) else 'n/a'} elementos.")
-                continue
-
             is_buy, trade_history = result
 
         except Exception as e:
             metrics.server_status_metric.set(0)
             offline_start = time.time()
-            logger.error(f"Erro inesperado no loop principal: {e}")
+            logger.error(f"Erro inesperado: {e}")
             time.sleep(25)
             offline_duration = time.time() - offline_start
             metrics.server_down_metric_duration.observe(offline_duration)
