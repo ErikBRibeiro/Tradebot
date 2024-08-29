@@ -6,7 +6,7 @@ import time
 from src.setups.stopgain import sell_stopgain, set_sell_stopgain_ratio
 from src.setups.stoploss import sell_stoploss, set_sell_stoploss_min_candles
 from src.setups.emas import buy_double_ema_breakout
-from src.parameters import short_period, long_period, ratio, stop_candles, ativo, timeframe, setup  # Importa variáveis de parameters.py
+from src.parameters import short_period, long_period, ratio, stop_candles, ativo, timeframe, setup  
 
 class TradingStrategy:
     def __init__(self, data_interface, metrics, symbol=ativo, interval=timeframe, setup=setup):
@@ -16,83 +16,85 @@ class TradingStrategy:
         self.interval = interval
         self.setup = setup
         self.position_maintained = False
-        self.last_log_time = time.time()  # Inicializa o temporizador de logs
+        self.last_log_time = time.time()
 
     def sell_logic(self, trade_history, current_time):
         if not self.position_maintained:
             logger.info("Loop de venda - Checando condições de venda.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
-        data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+        klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
+        candles = klines['result']['list']
+        
+        data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
         
         data['low'] = data['low'].apply(safe_float_conversion)
         data['high'] = data['high'].apply(safe_float_conversion)
 
-        if current_time - self.last_log_time >= 120:
-            logger.info("Obtendo preço atual...")
         ticker = self.data_interface.get_current_price(self.symbol)
         if ticker is None:
-            if current_time - self.last_log_time >= 120:
-                logger.warning("Preço atual não obtido. Tentando novamente...")
+            logger.warning("Preço atual não obtido. Tentando novamente...")
             return True, trade_history
 
-        if current_time - self.last_log_time >= 120:
-            logger.info(f"Preço atual obtido: {ticker}")
+        if not trade_history.empty:
+            stoploss = trade_history['stoploss'].iloc[-1]
+            stopgain = trade_history['stopgain'].iloc[-1]
+        else:
+            logger.error("Histórico de negociações está vazio. Não foi possível definir stoploss e stopgain.")
+            stoploss = None
+            stopgain = None
 
-        stoploss = trade_history['stoploss'].iloc[-1]
-        stopgain = trade_history['stopgain'].iloc[-1]
+        if stoploss is None or stopgain is None:
+            logger.info("Venda não realizada devido à falta de stoploss e stopgain.")
+            return True, trade_history
 
-        if current_time - self.last_log_time >= 120:
-            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}")
+        if current_time - self.last_log_time >= 1200:
+            logger.info(f"Condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]} ")
+            self.last_log_time = current_time
 
-        if sell_stoploss(data['low'].iloc[-1], stoploss) or sell_stopgain(data['high'].iloc[-1], stopgain):
-            if current_time - self.last_log_time >= 120:
-                logger.info("Condições de venda atendidas, tentando executar venda...")
+        if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
+            logger.info("Condições de venda atendidas, tentando executar venda...")
             start_time = time.time()
-            balance_asset = self.data_interface.get_current_balance(self.symbol.replace('USDT', ''))
-            lot_size = self.data_interface.get_lot_size(self.symbol)
+            balance_asset = self.data_interface.get_current_balance('USDT')
+            lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
             if balance_asset > 0 and lot_size:
-                quantity_to_sell = (balance_asset // lot_size) * lot_size
-                if quantity_to_sell > 0:
-                    quantity_to_sell = round(quantity_to_sell, 8)
-                    order = self.data_interface.create_order(self.symbol, 'SELL', quantity_to_sell)
+                if float(lot_size) > 0:
+                    order = self.data_interface.close_order(self.symbol)
                     if order is not None:
                         trade_duration = time.time() - start_time
                         self.metrics.sell_duration_metric.labels(self.symbol).observe(trade_duration)
                         self.metrics.total_trade_duration += trade_duration
-                        if current_time - self.last_log_time >= 120:
-                            logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Stoploss: {stoploss}, Stopgain: {stopgain}")
-                        trade_history = update_trade_history(trade_history, ticker)  # Usa a função do utils.py
+
+                        outcome = "Stoploss" if sell_stoploss(data['low'].iloc[0], stoploss) else "Stopgain"
+                        logger.info(f"Venda realizada em {trade_duration:.2f} segundos. Preço: {ticker}, Resultado: {outcome}, Stoploss: {stoploss}, Stopgain: {stopgain}")
+
+                        self.metrics.transaction_outcome_metric.labels(self.symbol).observe(trade_duration)  # Adicionando o resultado da transação
+
+                        trade_history = update_trade_history(trade_history, ticker)
                         self.metrics.update_metrics_on_sell(ticker, self.symbol)
                         self.position_maintained = False
-                        self.last_log_time = current_time
-                        return False, trade_history  # Atualiza para indicar que não está mais comprado
+                        return False, trade_history
                     else:
                         logger.error("Erro ao tentar criar a ordem de venda.")
-                else:
-                    if current_time - self.last_log_time >= 120:
-                        logger.info("Quantidade ajustada para venda é menor que o tamanho do lote.")
-                    self.position_maintained = False
-                    return False, trade_history
             else:
-                if current_time - self.last_log_time >= 120:
-                    logger.info("Saldo de ativo insuficiente para venda.")
-                self.position_maintained = False
-                return False, trade_history
+                logger.info("Saldo de ativo insuficiente para venda.")
+            self.position_maintained = False
+            return False, trade_history
 
-        if current_time - self.last_log_time >= 120:
+        if current_time - self.last_log_time >= 1200:
             logger.info("Condições de venda não atendidas, mantendo posição.")
             self.last_log_time = current_time
-        return True, trade_history  # Continua indicando que está comprado
+        return True, trade_history  
 
     def buy_logic(self, trade_history, current_time):
         if not self.position_maintained:
             logger.info("Loop de compra - Checando condições de compra.")
             self.position_maintained = True
 
-        klines = self.data_interface.client.get_klines(symbol=self.symbol, interval=self.interval, limit=150)
-        data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+        klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
+        candles = klines['result']['list']
+        
+        data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
 
         data['close'] = data['close'].apply(safe_float_conversion)
         data['low'] = data['low'].apply(safe_float_conversion)
@@ -102,41 +104,45 @@ class TradingStrategy:
         data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
 
         if data[['close', 'low', 'high', 'volume']].isnull().any().any():
-            logger.error("Dados corrompidos recebidos da API Binance.")
+            logger.error("Dados corrompidos recebidos da API Bybit.")
             return False, trade_history
 
-        current_price = data['close'].iloc[-1]
+        current_price = data['close'].iloc[0]
 
         if buy_double_ema_breakout(data, f'EMA_{short_period}', f'EMA_{long_period}'):
             logger.info("Condições de compra atendidas, tentando executar compra...")
             start_time = time.time()
 
-            # Obtém o saldo disponível em USDT
             balance_usdt = self.data_interface.get_current_balance('USDT')
             if balance_usdt > 0:
-                # Calcula a quantidade de ativo a ser comprado com todo o saldo USDT disponível
-                quantity_to_buy = balance_usdt / current_price
-
-                # Ajusta a quantidade para o tamanho do lote
-                lot_size = self.data_interface.get_lot_size(self.symbol)
+                
+                quantity_to_buy = (balance_usdt / current_price)
+                truncated_quantity = int(quantity_to_buy * 1000) / 1000  # Truncado para 3 casas decimais
+                
+                lot_size = self.data_interface.get_lot_size(self.symbol, self.data_interface)
+                logger.info(f"quantity_to_buy: {quantity_to_buy}, truncated_quantity: {truncated_quantity}, lot_size:{lot_size}")
+                
                 if lot_size:
-                    quantity_to_buy = (quantity_to_buy // lot_size) * lot_size
-                    quantity_to_buy = round(quantity_to_buy, 8)  # Arredonda para 8 casas decimais
 
-                    if quantity_to_buy > 0:
-                        order = self.data_interface.create_order(self.symbol, 'BUY', quantity_to_buy)
+                    if truncated_quantity > 0:
+                        order = self.data_interface.create_order(self.symbol, 'Buy', truncated_quantity)
                         if order is not None:
+                            trade_duration = time.time() - start_time
+                            self.metrics.buy_duration_metric.labels(self.symbol).observe(trade_duration)  # Registrando a duração da compra
+
                             stoploss = set_sell_stoploss_min_candles(data, stop_candles)
-                            stopgain = set_sell_stopgain_ratio(data['close'].iloc[-1], stoploss, ratio)
+                            stopgain = set_sell_stopgain_ratio(data['close'].iloc[0], stoploss, ratio)
                             potential_loss = calculate_loss_percentage(current_price, stoploss)
                             potential_gain = calculate_gain_percentage(current_price, stopgain)
-                            logger.info(f"Compramos - Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}")
+
+                            logger.info(f"Compra realizada! Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Potential Gain: {potential_gain}%, Potential Loss: {potential_loss}%")
+
                             new_row = pd.DataFrame({
                                 'horario': [datetime.now()],
                                 'moeda': [self.symbol],
                                 'valor_compra': [current_price],
                                 'valor_venda': [None],
-                                'quantidade_moeda': [quantity_to_buy],
+                                'quantidade_moeda': [truncated_quantity],
                                 'max_referencia': [data['high'].iloc[-2]],
                                 'min_referencia': [set_sell_stoploss_min_candles(data, stop_candles)],
                                 'stoploss': [stoploss],
@@ -158,14 +164,3 @@ class TradingStrategy:
                             logger.error("Erro ao tentar criar a ordem de compra.")
                             self.position_maintained = False
                             return False, trade_history
-                    else:
-                        logger.error("Quantidade calculada para compra é menor que o tamanho do lote.")
-                else:
-                    logger.error("Tamanho do lote não encontrado para o símbolo.")
-            else:
-                logger.error("Saldo insuficiente em USDT para realizar a compra.")
-
-        if current_time - self.last_log_time >= 120:
-            logger.info("Condições de compra não atendidas.")
-            self.last_log_time = current_time
-        return False, trade_history

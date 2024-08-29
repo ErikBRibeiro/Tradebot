@@ -1,111 +1,141 @@
 import time
 import pandas as pd
-from binance.client import Client
-from binance import exceptions
+from pybit.unified_trading import HTTP
 from requests.exceptions import ConnectionError, Timeout
 from src.parameters import short_period, long_period
 from src.utils import logger, safe_float_conversion
+import os
 
 class LiveData:
-    def __init__(self, api_key, api_secret):
-        self.client = Client(api_key, api_secret, requests_params={'timeout': 20})
+    def __init__(self, api_key, api_secret, futures=False):
+        self.api_key = api_key 
+        self.api_secret = api_secret
+        self.futures = futures
+        if self.futures:
+            self.client = HTTP(api_key=api_key, api_secret=api_secret)
+        else:
+            self.client = HTTP(api_key=api_key, api_secret=api_secret)
         self.current_price = None
+
+    def check_rate_limit(self, headers):
+        limit_status = int(headers.get("X-Bapi-Limit-Status", -1))
+        limit_reset_timestamp = int(headers.get("X-Bapi-Limit-Reset-Timestamp", time.time()))
+
+        if limit_status <= 2:
+            sleep_time = max(0, limit_reset_timestamp - time.time())
+            logger.warning(f"Rate limit exceeded. Sleeping for {sleep_time} seconds.")
+            time.sleep(sleep_time + 1)  # Sleep for an extra second to ensure reset.
 
     def get_historical_data(self, symbol, interval, limit=150):
         try:
-            logger.info(f"Requisitando dados históricos para {symbol} com intervalo {interval}")
-            klines = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+            if self.futures:
+                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
+            else:
+                response = self.client.get_kline(symbol=symbol, interval=interval, limit=limit, category='linear')
 
-            data = pd.DataFrame(klines, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
+
+            data = pd.DataFrame(response['result'], columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time'])
 
             data['close'] = data['close'].apply(safe_float_conversion)
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
             data['volume'] = data['volume'].apply(safe_float_conversion)
-            
-            # Substituindo os valores fixos de EMA pelos valores definidos em parameters.py
             data[f'EMA_{short_period}'] = data['close'].ewm(span=short_period, adjust=False).mean()
             data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
-                logger.error("Dados corrompidos recebidos da API Binance.")
+                logger.error("Dados corrompidos recebidos da API Bybit.")
                 return None
 
             return data
 
-        except exceptions.BinanceAPIException as e:
-            logger.error(f"Erro na API Binance ao obter dados históricos: {e}")
-            return None
-        except (ConnectionError, Timeout) as e:
-            logger.error(f"Erro de conexão ao obter dados históricos: {e}")
-            return None
         except Exception as e:
             logger.error(f"Erro inesperado ao obter dados históricos: {e}")
             return None
 
     def get_current_price(self, symbol):
         try:
-            logger.info(f"Requisitando preço atual para {symbol}")
-            ticker = float(self.client.get_symbol_ticker(symbol=symbol)['price'])
-            logger.info(f"Preço atual para {symbol}: {ticker}")
+            if self.futures:
+                response = self.client.get_tickers(symbol=symbol, category='linear')
+            else:
+                response = self.client.get_tickers(symbol=symbol, category='linear')
+
+            # Loga a resposta bruta para verificar o conteúdo
+            #logger.info(f"Resposta da API ao obter preço: {response}")
+
+            # Verifique se 'result' existe e não está vazio
+            if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
+                logger.error(f"Erro ao obter preço: resposta inválida ou vazia.")
+                return 0  # Retorna 0 em caso de erro
+
+            # Verifique o conteúdo do primeiro resultado
+            if 'lastPrice' not in response['result']['list'][0]:
+                logger.error(f"Erro ao obter preço: campo 'lastPrice' não encontrado.")
+                return 0  # Retorna 0 se o campo não for encontrado
+
+            # Extraia o preço corretamente
+            ticker = float(response['result']['list'][0]['lastPrice'])
             return ticker
-        except exceptions.BinanceAPIException as e:
-            logger.error(f"Erro na API Binance ao obter preço atual: {e}")
-            return None
         except Exception as e:
             logger.error(f"Erro inesperado ao obter preço atual: {e}")
-            return None
+            return 0
+
+
+
 
     def get_current_balance(self, asset):
         try:
-            logger.info(f"Requisitando saldo para {asset}")
-            balance_info = self.client.get_asset_balance(asset=asset)
-            balance_value = float(balance_info['free'])
-            logger.info(f"Saldo disponível para {asset}: {balance_value}")
-            return balance_value
-        except exceptions.BinanceAPIException as e:
-            logger.error(f"Erro na API Binance ao obter saldo: {e}")
-            return 0.0
+            if self.futures:
+                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
+            else:
+                response = self.client.get_wallet_balance(accountType="UNIFIED", coin=asset)
+
+            return float(response['result']['list'][0]['totalEquity'])
         except Exception as e:
             logger.error(f"Erro inesperado ao obter saldo: {e}")
             return 0.0
 
-    def get_lot_size(self, symbol):
+    def get_lot_size(self, symbol, data_interface):
         try:
-            logger.info(f"Requisitando LOT_SIZE para {symbol}")
-            info = self.client.get_symbol_info(symbol)
-            for f in info['filters']:
-                if f['filterType'] == 'LOT_SIZE':
-                    lot_size = float(f['stepSize'])
-                    logger.info(f"LOT_SIZE para {symbol}: {lot_size}")
-                    return lot_size
-            logger.warning(f"LOT_SIZE não encontrado para {symbol}")
-            return None
-        except exceptions.BinanceAPIException as e:
-            logger.error(f"Erro na API Binance ao obter LOT_SIZE: {e}")
-            return None
+            response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
+            response = response['result']['list'][0]['size']
+            return response
+
         except Exception as e:
             logger.error(f"Erro inesperado ao obter LOT_SIZE: {e}")
             return None
 
     def create_order(self, symbol, side, quantity):
         try:
-            logger.info(f"Criando ordem: {side} {quantity} de {symbol}")
-            if side.lower() == 'buy':
-                order = self.client.order_market_buy(symbol=symbol, quantity=quantity)
-            elif side.lower() == 'sell':
-                order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+            if self.futures:
+                if side.lower() == 'buy':
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
+                else:
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
             else:
-                logger.error(f"Tipo de ordem não reconhecido: {side}")
-                return None
+                if side.lower() == 'buy':
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
+                elif side.lower() == 'sell':
+                    response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Buy', orderType="Market", qty=quantity)
+                else:
+                    logger.error(f"Tipo de ordem não reconhecido: {side}")
+                    return None
 
-            logger.info(f"Ordem criada com sucesso: {order}")
-            return order
-        except exceptions.BinanceAPIException as e:
-            logger.error(f"Erro ao criar ordem na Binance: {e}")
-            return None
+            # Check rate limit from headers
+            #self.check_rate_limit(response.headers)
+
+            return response
         except Exception as e:
             logger.error(f"Erro inesperado ao criar ordem: {e}")
+            return None
+
+    def close_order(self, symbol):
+        try:
+            response = self.client.place_order(category='linear', symbol=symbol, isLeverage=1, side='Sell', orderType="Market", qty=0, reduceOnly=True, closeOnTrigger=True)
+
+            return response
+        except Exception as e:
+            logger.error(f"Erro inesperado ao fechar ordem: {e}")
             return None
 
     def update_price_continuously(self, symbol, frequency_per_second=1):
@@ -117,3 +147,20 @@ class LiveData:
             except Exception as e:
                 logger.error(f"Erro ao atualizar o preço continuamente: {e}")
             time.sleep(interval)
+
+
+    def read_trade_history():
+        try:
+            # Define o caminho completo para o arquivo trade_history.csv dentro da pasta data
+            file_path = os.path.join('data', 'trade_history.csv')
+            
+            # Tenta ler o histórico de um arquivo CSV
+            df = pd.read_csv(file_path)
+            if df.empty:
+                logger.info("Histórico de transações vazio.")
+                return []
+            return df
+        except FileNotFoundError:
+            logger.warning("Arquivo de histórico de transações não encontrado, iniciando com histórico vazio.")
+            return []
+
