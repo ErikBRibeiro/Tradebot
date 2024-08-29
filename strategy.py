@@ -33,15 +33,21 @@ class TradingStrategy:
                 return False, trade_history  # Inicia o ciclo de compra
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-            candles = klines['result']['list']
+            if klines is None:
+                logger.error("Erro: klines retornou None")
+                return False, trade_history
+
+            candles = klines.get('result', {}).get('list', [])
+            if not candles:
+                logger.error("Erro: candles retornou lista vazia")
+                return False, trade_history
             
             data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
-            
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
 
             ticker = self.data_interface.get_current_price(self.symbol)
-            if ticker is None:
+            if ticker == 0:
                 logger.warning("Preço atual não obtido. Tentando novamente...")
                 return True, trade_history
 
@@ -110,7 +116,14 @@ class TradingStrategy:
                 self.position_maintained = True
 
             klines = self.data_interface.client.get_kline(symbol=self.symbol, interval=self.interval, limit=150, category='linear')
-            candles = klines['result']['list']
+            if klines is None:
+                logger.error("Erro: klines retornou None")
+                return False, trade_history
+
+            candles = klines.get('result', {}).get('list', [])
+            if not candles:
+                logger.error("Erro: candles retornou lista vazia")
+                return False, trade_history
             
             data = pd.DataFrame(candles, columns=['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
 
