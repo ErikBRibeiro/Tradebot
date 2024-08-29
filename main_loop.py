@@ -3,7 +3,7 @@ import time
 from config import API_KEY, API_SECRET
 from data_interface import LiveData
 from strategy import TradingStrategy
-from metrics import Metrics, start_prometheus_server, server_status_metric, server_down_metric_duration
+from metrics import Metrics, start_prometheus_server
 from src.utils import read_trade_history, logger
 from src.parameters import ativo, timeframe, setup
 
