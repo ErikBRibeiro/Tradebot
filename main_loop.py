@@ -23,7 +23,7 @@ def check_last_transaction(data_interface, symbol):
         if size > 0:
             return True
         else:
-            logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
+            #logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
             return False
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
