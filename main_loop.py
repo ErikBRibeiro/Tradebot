@@ -9,25 +9,30 @@ from src.parameters import ativo, timeframe, setup
 
 start_prometheus_server()
 
-def check_last_transaction(data_interface, symbol):
+def check_last_transaction(data_interface, symbol, last_log_time):
     try:
         response = data_interface.client.get_positions(symbol=symbol, category="linear", limit=1)
         
         if 'result' not in response or 'list' not in response['result'] or len(response['result']['list']) == 0:
             logger.info("Nenhuma posição encontrada. Considerando executar uma compra...")
-            return False
+            return False, last_log_time
         
         position = response['result']['list'][0]
         size = float(position['size'])
 
+        current_time = time.time()
+        
         if size > 0:
-            return True
+            return True, last_log_time
         else:
-            #logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
-            return False
+            # Logar a cada 10 minutos
+            if current_time - last_log_time >= 600:  # 600 segundos = 10 minutos
+                logger.info("Posição aberta tem tamanho 0, pode considerar comprar.")
+                last_log_time = current_time
+            return False, last_log_time
     except Exception as e:
         logger.error(f"Erro ao verificar a última transação: {e}")
-        return False
+        return False, last_log_time
 
 def check_open_position(data_interface, symbol):
     try:
@@ -70,7 +75,7 @@ def main_loop():
         try:
             current_time = time.time()
 
-            is_buy = check_last_transaction(data_interface, ativo)
+            is_buy, last_log_time = check_last_transaction(data_interface, ativo, last_log_time)
             metrics.loop_counter_metric.labels(ativo).inc()
 
             metrics.server_status_metric.set(1)
