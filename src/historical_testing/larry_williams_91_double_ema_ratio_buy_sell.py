@@ -39,6 +39,7 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
             params['endTime'] = end_time
         
         response = client.get_kline(symbol=symbol, interval=interval, limit=limit, start=start_time, category='linear')
+        # response = client.get_kline(symbol=symbol, interval=interval, limit=limit, start=start_time, end=end_time, category='linear')
         
         if response['retMsg'] != 'OK':
             break
@@ -59,8 +60,9 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
             break
 
         data.extend(new_data)
+        # TODO: TEST - ADD 15m -> "timestamp + datetime.timedelta(minutes = 15)""
         start_time = int(new_data[-1][0]) + 1  # Add 1 ms to avoid overlap
-        print(start_time)
+        # print(start_time)
 
         # print(data)
         
@@ -72,7 +74,10 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     
     df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
 
-    print(df)
+    # reverse the order of the data
+    df = df.iloc[::-1].reset_index(drop=True)
+
+    # print(df)
 
     return df
 
@@ -183,7 +188,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2024-08-01'
+start_date = '2024-01-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
@@ -239,9 +244,9 @@ trade_status = Trade_Status.espera
 results = {}
 trades = []
 
-for i in range(999, len(data)):
-    year = data['open_time'].iloc[i - 1].year
-    month = data['open_time'].iloc[i - 1].month
+for i in range(len(data)-1000, -1,-1):
+    year = data['open_time'].iloc[i].year
+    month = data['open_time'].iloc[i].month
 
     if year not in results:
         results[year] = {}
@@ -258,7 +263,7 @@ for i in range(999, len(data)):
         }
 
     if trade_status == Trade_Status.comprado:
-        if StopLoss.sell_stoploss(data['low'].iloc[i - 1], stoploss):
+        if StopLoss.sell_stoploss(data['low'].iloc[i], stoploss):
             loss_percentage = utils.calculate_loss_percentage(open_price, stoploss)
             results[year][month]['failed_trades'] += 1
             results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
@@ -269,7 +274,7 @@ for i in range(999, len(data)):
             # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
-            trade['close_time'] = data['open_time'].iloc[i - 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = loss_percentage
             trade['result'] = 'StopLoss'
             trades.append(trade)
@@ -294,7 +299,7 @@ for i in range(999, len(data)):
 
             continue
             
-        elif StopGain.sell_stopgain(data['high'].iloc[i - 1], stopgain):
+        elif StopGain.sell_stopgain(data['high'].iloc[i], stopgain):
             profit = utils.calculate_gain_percentage(open_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
@@ -305,7 +310,7 @@ for i in range(999, len(data)):
             # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
-            trade['close_time'] = data['open_time'].iloc[i - 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = profit
             trade['result'] = 'StopGain'
             trades.append(trade)
@@ -373,10 +378,10 @@ for i in range(999, len(data)):
 
     if trade_status == Trade_Status.espera: 
     # if trade_status == Trade_Status.espera and data['close'].iloc[i - 1] > data['EMA_200'].iloc[i - 1]: 
-        if emas.buy_double_ema_breakout(data.iloc[i - 5:i], 'EMA_9', 'EMA_21'):
+        if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
-            open_price = data['high'].iloc[i - 2]
-            stoploss = StopLoss.set_sell_stoploss_min_candles(data.iloc[i - 15:i], 14)
+            open_price = data['high'].iloc[i + 1]
+            stoploss = StopLoss.set_sell_stoploss_min_candles(data.iloc[i:i + 15], 14)
             if taxa_por_operacao != 0:
                 saldo -= saldo * taxa_por_operacao / 100
             results[year][month]['saldo_final'] = saldo
@@ -391,7 +396,7 @@ for i in range(999, len(data)):
 
             trade = {
                 'type': 'buy',
-                'open_time': data['open_time'].iloc[i - 1],
+                'open_time': data['open_time'].iloc[i],
                 'open_price': open_price,
                 'stoploss': stoploss,
                 'stopgain': stopgain,
@@ -537,4 +542,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-# plot_trades(data, trades, pd.to_datetime(start_date))
+plot_trades(data, trades, pd.to_datetime(start_date))
