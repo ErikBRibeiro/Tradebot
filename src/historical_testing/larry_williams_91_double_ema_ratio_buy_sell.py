@@ -1,7 +1,9 @@
+import os
 from enum import Enum
 import pandas as pd
 from datetime import datetime, timedelta
-import requests
+from pybit.unified_trading import HTTP
+
 import plotly.graph_objects as go
 import numpy as np
 
@@ -14,8 +16,12 @@ import setups.emas as emas
 import setups.stopgain as StopGain
 import setups.stoploss as StopLoss
 
+API_KEY = os.getenv('BYBIT_API_KEY')
+API_SECRET = os.getenv('BYBIT_API_SECRET')
+
+client = HTTP(api_key=API_KEY, api_secret=API_SECRET)
+
 def fetch_candles(symbol, interval, start_str, end_str=None):
-    url = 'https://fapi.binance.com/fapi/v1/klines'  
     data = []
     limit = 1000
     start_time = int(pd.to_datetime(start_str).timestamp() * 1000)
@@ -28,33 +34,46 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
             'startTime': start_time,
             'limit': limit
         }
+
         if end_time:
             params['endTime'] = end_time
         
-        response = requests.get(url, params=params)
+        response = client.get_kline(symbol=symbol, interval=interval, limit=limit, start=start_time, category='linear')
         
-        if response.status_code != 200:
+        if response['retMsg'] != 'OK':
             break
         
-        new_data = response.json()
+        new_data = list(reversed(response['result']['list']))
         if not new_data:
             break
-        
+        # print('################### START ###################')
+        # print(new_data)
+        # print('#################### MID ####################')
+        # print(data)
+        # print('#################### END ####################')
+
+        # print(f"Fetching data from {pd.to_datetime(new_data[0][0], unit='ms')} to {pd.to_datetime(new_data[-1][0], unit='ms')}")
+
+        # TODO: ARRUMAR A CONDIÇÃO PARADA DA CONCATENAÇÃO DOS DADOS
+        if data and len(new_data) <= 1 and data[-1] == new_data[0]:
+            break
+
         data.extend(new_data)
-        start_time = new_data[-1][0] + 1  # Add 1 ms to avoid overlap
+        start_time = int(new_data[-1][0]) + 1  # Add 1 ms to avoid overlap
+        print(start_time)
+
+        # print(data)
         
     if not data:
         return pd.DataFrame()  # Return empty DataFrame
-    
-    columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time',
-               'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume',
-               'taker_buy_quote_asset_volume', 'ignore']
+
+    columns = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'turnover']
     df = pd.DataFrame(data, columns=columns)
-    df = df[['open', 'high', 'low', 'close', 'open_time', 'close_time']]
     
     df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
-    df['close_time'] = pd.to_datetime(df['close_time'], unit='ms')
-    
+
+    print(df)
+
     return df
 
 def plot_trades(data, trades, start_date):
@@ -164,12 +183,12 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2022-01-01'
+start_date = '2024-08-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
 ativo = 'BTCUSDT'
-timeframe = '15m'
+timeframe = '15'
 alavancagem = 1  # Ajuste a alavancagem conforme necessário
 
 data = fetch_candles(ativo, timeframe, adjusted_start_date, end_date)
@@ -206,6 +225,7 @@ max_drawdown = 0
 initial_drawdown = 0
 perdas = []
 ganhos = []
+ratio = 0
 
 risk_free_rate = 0.05  # determinar taxa de juros de títulos públicos para o período testado
 
@@ -220,8 +240,8 @@ results = {}
 trades = []
 
 for i in range(999, len(data)):
-    year = data['close_time'].iloc[i - 1].year
-    month = data['close_time'].iloc[i - 1].month
+    year = data['open_time'].iloc[i - 1].year
+    month = data['open_time'].iloc[i - 1].month
 
     if year not in results:
         results[year] = {}
@@ -517,4 +537,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-plot_trades(data, trades, pd.to_datetime(start_date))
+# plot_trades(data, trades, pd.to_datetime(start_date))
