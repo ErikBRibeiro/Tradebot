@@ -52,6 +52,11 @@ class TradingStrategy:
             if stoploss is None or stopgain is None:
                 return True, trade_history
 
+            # Log do horário da vela de referência para o stoploss e da vela atual
+            referencia_time = pd.to_datetime(data['open_time'].iloc[1], unit='ms')
+            current_time = pd.to_datetime(data['open_time'].iloc[0], unit='ms')
+            logger.info(f"Horário da vela referência para stoploss: {referencia_time}, Horário da vela atual: {current_time}")
+
             # Emitir um log a cada 10 minutos
             if current_time - self.last_log_time >= 600:  # 600 segundos = 10 minutos
                 logger.info(f"Verificando condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]}")
@@ -138,6 +143,11 @@ class TradingStrategy:
                     potential_loss = calculate_loss_percentage(current_price, stoploss)
                     potential_gain = calculate_gain_percentage(current_price, stopgain)
 
+                    # Log do horário da vela de referência para o stoploss e da vela atual
+                    referencia_time = pd.to_datetime(data['open_time'].iloc[1], unit='ms')
+                    current_time = pd.to_datetime(data['open_time'].iloc[0], unit='ms')
+                    logger.info(f"Horário da vela referência para stoploss: {referencia_time}, Horário da vela atual: {current_time}")
+
                     logger.info(f"Compra realizada! Preço: {current_price}, Stoploss: {stoploss}, Stopgain: {stopgain}, Potential Gain: {potential_gain}%, Potential Loss: {potential_loss}%")
 
                     new_row = pd.DataFrame({
@@ -146,7 +156,7 @@ class TradingStrategy:
                         'valor_compra': [current_price],
                         'valor_venda': [None],
                         'quantidade_moeda': [truncated_quantity],
-                        'max_referencia': [data['high'].iloc[-2]],
+                        'max_referencia': [data['high'].iloc[1]],
                         'min_referencia': [set_sell_stoploss_min_candles(data, stop_candles)],
                         'stoploss': [stoploss],
                         'stopgain': [stopgain],
