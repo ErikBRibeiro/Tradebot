@@ -58,9 +58,9 @@ class TradingStrategy:
             logger.info(f"Horário da vela referência para stoploss: {referencia_time}, Horário da vela atual: {current_time}")
 
             # Emitir um log a cada 10 minutos
-            if current_time - self.last_log_time >= 600:  # 600 segundos = 10 minutos
+            if (pd.Timestamp.now() - self.last_log_time).total_seconds() >= 600:  # 600 segundos = 10 minutos
                 logger.info(f"Verificando condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]}")
-                self.last_log_time = current_time
+                self.last_log_time = pd.Timestamp.now()
 
             if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
                 start_time = time.time()
@@ -94,6 +94,7 @@ class TradingStrategy:
         except Exception as e:
             logger.error(f"Erro em sell_logic: {e}")
             return False, trade_history
+
 
     def buy_logic(self, trade_history, current_time):
         try:
