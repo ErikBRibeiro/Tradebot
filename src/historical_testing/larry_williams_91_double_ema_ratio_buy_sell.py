@@ -73,6 +73,12 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df = pd.DataFrame(data, columns=columns)
     
     df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
+    df['close'] = df['close'].astype(float)
+    df['low'] = df['low'].astype(float)
+    df['high'] = df['high'].astype(float)
+    df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
+    df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
+    df['EMA_200'] = df['close'].ewm(span=200, adjust=False).mean()
 
     # reverse the order of the data
     df = df.iloc[::-1].reset_index(drop=True)
@@ -188,7 +194,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2024-01-01'
+start_date = '2024-07-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
@@ -200,13 +206,6 @@ data = fetch_candles(ativo, timeframe, adjusted_start_date, end_date)
 if data.empty:
     print("No data available for the given period.")
     sys.exit()
-
-data['close'] = data['close'].astype(float)
-data['low'] = data['low'].astype(float)
-data['high'] = data['high'].astype(float)
-data['EMA_9'] = data['close'].ewm(span=9, adjust=False).mean()
-data['EMA_21'] = data['close'].ewm(span=21, adjust=False).mean()
-data['EMA_200'] = data['close'].ewm(span=200, adjust=False).mean()
 
 # data2 = fetch_candles(ativo, '1d', adjusted_start_date, end_date)
 # if data2.empty:
@@ -542,4 +541,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-plot_trades(data, trades, pd.to_datetime(start_date))
+# plot_trades(data, trades, pd.to_datetime(start_date))

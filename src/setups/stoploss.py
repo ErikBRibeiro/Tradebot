@@ -12,8 +12,8 @@ def sell_stoploss(current_price, stoploss):
 
 # define o preço de fechamento em stoploss para uma operação de venda
 def set_buy_stoploss_max_candles(data, candles=2):
-    return max(data['high'].tail(candles).tolist())
+    return max(data['high'].head(candles).tolist())
 
 # define o preço de fechamento em stoploss para uma operação de compra
 def set_sell_stoploss_min_candles(data, candles=2):
-    return min(data['low'].tail(candles).tolist())
+    return min(data['low'].head(candles).tolist())
