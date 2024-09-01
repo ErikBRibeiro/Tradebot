@@ -112,8 +112,12 @@ class TradingStrategy:
             data['low'] = data['low'].apply(safe_float_conversion)
             data['high'] = data['high'].apply(safe_float_conversion)
             data['volume'] = data['volume'].apply(safe_float_conversion)
+
+            # Inversão do dataframe para calcular as médias móveis corretamente
+            data = data.iloc[::-1]
             data[f'EMA_{short_period}'] = data['close'].ewm(span=short_period, adjust=False).mean()
             data[f'EMA_{long_period}'] = data['close'].ewm(span=long_period, adjust=False).mean()
+            data = data.iloc[::-1]
 
             if data[['close', 'low', 'high', 'volume']].isnull().any().any():
                 return False, trade_history
