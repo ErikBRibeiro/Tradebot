@@ -55,17 +55,13 @@ class TradingStrategy:
             # Log do horário da vela de referência para o stoploss e da vela atual
             referencia_time = pd.to_datetime(data['open_time'].iloc[1], unit='ms')
             current_time = pd.to_datetime(data['open_time'].iloc[0], unit='ms')
-            logger.info(f"Horário da vela referência para stoploss: {referencia_time}, Horário da vela atual: {current_time}")
-
-            # Convertendo ambos os tempos para segundos desde o epoch
-            current_time_seconds = current_time.timestamp()
-            last_log_time_seconds = self.last_log_time if isinstance(self.last_log_time, float) else self.last_log_time.timestamp()
 
             # Emitir um log a cada 10 minutos
-            if current_time_seconds - last_log_time_seconds >= 600:  # 600 segundos = 10 minutos
-                logger.info(f"Verificando condições de venda - Stoploss: {stoploss}, Stopgain: {stopgain}, Minima da vela atual: {data['low'].iloc[0]}")
-                self.last_log_time = current_time  # Atualizar last_log_time com o Timestamp atual
+            if not hasattr(self, 'last_log_time') or (time.time() - self.last_log_time) >= 600:
+                logger.info(f"Horário da vela referência para stoploss: {referencia_time}, Horário da vela atual: {current_time}")
+                self.last_log_time = time.time()
 
+            # Verificar condições de venda
             if sell_stoploss(data['low'].iloc[0], stoploss) or sell_stopgain(data['high'].iloc[0], stopgain):
                 start_time = time.time()
                 balance_asset = self.data_interface.get_current_balance('USDT')
