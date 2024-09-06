@@ -119,11 +119,18 @@ def plot_trades(data, trades, start_date):
         name='EMA 21',
         line=dict(color='rgb(148,0,211)', width=1)
     ))
+    # Garantir que 'data' seja uma cópia completa do DataFrame (se estiver vindo de uma slice)
+    data = data.copy()
+
+    # Adicionar uma coluna para a EMA 9 semanal no DataFrame de 15 minutos
+    data['EMA_9_weekly'] = data['open_time'].apply(lambda x: get_weekly_ema_9(x, data2))
+
+    # Adicionar a EMA 9 semanal ao gráfico
     fig.add_trace(go.Scatter(
         x=data['open_time'],
-        y=data['EMA_200'],
+        y=data['EMA_9_weekly'],
         mode='lines',
-        name='EMA 200',
+        name='EMA 9 Semanal',
         line=dict(color='rgb(0,114,163)', width=1)
     ))
 
@@ -193,6 +200,29 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     sharpe_ratio = mean_excess_return / std_excess_return if std_excess_return != 0 else 0
     return sharpe_ratio
 
+def get_weekly_ema_9(timestamp, data2):
+    # Converter o timestamp da vela de 15 minutos para o formato de datetime
+    candle_time = pd.to_datetime(timestamp)
+
+    # Filtrar a vela de data2 que corresponde à semana do candle_time
+    for i in range(len(data2)):
+        # Obter o tempo de início da vela semanal
+        start_week = pd.to_datetime(data2['open_time'].iloc[i])
+        
+        if i == len(data2) - 1:
+            # A última vela cobre até a data atual
+            end_week = datetime.now()
+        else:
+            # O final da semana é o início da próxima vela semanal
+            end_week = pd.to_datetime(data2['open_time'].iloc[i + 1])
+
+        # Verifica se o tempo da vela de 15m está dentro do intervalo da vela semanal
+        if start_week <= candle_time < end_week:
+            return data2['EMA_9'].iloc[i]
+
+    # Caso não seja encontrado, retornar None ou algum valor padrão
+    return None
+
 # Configurações iniciais
 start_date = '2024-07-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
@@ -207,16 +237,10 @@ if data.empty:
     print("No data available for the given period.")
     sys.exit()
 
-# data2 = fetch_candles(ativo, '1d', adjusted_start_date, end_date)
-# if data2.empty:
-#     print("No data available for the given period.")
-#     sys.exit()
-#
-# data2['close'] = data2['close'].astype(float)
-# data2['low'] = data2['low'].astype(float)
-# data2['high'] = data2['high'].astype(float)
-# data2['EMA_9'] = data2['close'].ewm(span=9, adjust=False).mean()
-# data2['EMA_21'] = data2['close'].ewm(span=21, adjust=False).mean()
+data2 = fetch_candles(ativo, 'w', adjusted_start_date, end_date)
+if data2.empty:
+    print("No data available for the given period.")
+    sys.exit()
 
 saldo_inicial = 1000  # Saldo inicial em dólares
 saldo = saldo_inicial * alavancagem  # Ajustando o saldo para considerar a alavancagem
@@ -376,7 +400,7 @@ for i in range(len(data)-1000, -1,-1):
             continue
 
     # if trade_status == Trade_Status.espera: 
-    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] > data['EMA_200'].iloc[i + 1]: 
+    if trade_status == Trade_Status.espera and  data['close'].iloc[i + 1] > get_weekly_ema_9(data['open_time'].iloc[i + 1], data2): 
         if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
             open_price = data['high'].iloc[i + 1]
@@ -406,7 +430,7 @@ for i in range(len(data)-1000, -1,-1):
             }
             continue
 
-    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] < data['EMA_200'].iloc[i + 1]:
+    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] < get_weekly_ema_9(data['open_time'].iloc[i + 1], data2):
         if emas.sell_double_ema_breakout(data.iloc[i:i+5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
             open_price = data['low'].iloc[i + 1]

@@ -322,61 +322,61 @@ for i in range(len(data)-1000, -1,-1):
 
             continue
 
-    if trade_status == Trade_Status.vendido:
-        if StopLoss.buy_stoploss(data['high'].iloc[i + 1], stoploss):
-            loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
-            results[year][month]['failed_trades'] += 1
-            results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
-            saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
-            results[year][month]['saldo_final'] = saldo
-            trade_status = Trade_Status.espera
+    # if trade_status == Trade_Status.vendido:
+    #     if StopLoss.buy_stoploss(data['high'].iloc[i - 1], stoploss):
+    #         loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
+    #         results[year][month]['failed_trades'] += 1
+    #         results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
+    #         saldo -= saldo * ((loss_percentage + taxa_por_operacao) / 100)
+    #         results[year][month]['saldo_final'] = saldo
+    #         trade_status = Trade_Status.espera
             
-            # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
+    #         # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
-            trade['close_price'] = stoploss
-            trade['close_time'] = data['open_time'].iloc[i + 1]
-            trade['outcome'] = loss_percentage
-            trade['result'] = 'StopLoss'
-            trades.append(trade)
-            perdas.append(-(loss_percentage + taxa_por_operacao))
+    #         trade['close_price'] = stoploss
+    #         trade['close_time'] = data['open_time'].iloc[i - 1]
+    #         trade['outcome'] = loss_percentage
+    #         trade['result'] = 'StopLoss'
+    #         trades.append(trade)
+    #         perdas.append(-(loss_percentage + taxa_por_operacao))
 
-            if saldo < min_saldo_since_max:
-                min_saldo_since_max = saldo
+    #         if saldo < min_saldo_since_max:
+    #             min_saldo_since_max = saldo
             
-            drawdown = (max_saldo - min_saldo_since_max) / max_saldo * 100
+    #         drawdown = (max_saldo - min_saldo_since_max) / max_saldo * 100
                 
-            if drawdown > max_drawdown:
-                 max_drawdown = drawdown
+    #         if drawdown > max_drawdown:
+    #              max_drawdown = drawdown
                     
-            results[year][month]['max_drawdown'] = max_drawdown
+    #         results[year][month]['max_drawdown'] = max_drawdown
 
-            continue
+    #         continue
             
-        elif StopGain.buy_stopgain(data['low'].iloc[i + 1], stopgain):
-            profit = utils.calculate_sell_gain_percentage(open_price, stopgain)
-            results[year][month]['lucro'] += profit - taxa_por_operacao
-            results[year][month]['successful_trades'] += 1
-            saldo += saldo * ((profit - taxa_por_operacao) / 100)
-            results[year][month]['saldo_final'] = saldo
-            trade_status = Trade_Status.espera
+    #     elif StopGain.buy_stopgain(data['low'].iloc[i - 1], stopgain):
+    #         profit = utils.calculate_sell_gain_percentage(open_price, stopgain)
+    #         results[year][month]['lucro'] += profit - taxa_por_operacao
+    #         results[year][month]['successful_trades'] += 1
+    #         saldo += saldo * ((profit - taxa_por_operacao) / 100)
+    #         results[year][month]['saldo_final'] = saldo
+    #         trade_status = Trade_Status.espera
 
-            # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
+    #         # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
-            trade['close_price'] = stopgain
-            trade['close_time'] = data['open_time'].iloc[i + 1]
-            trade['outcome'] = profit
-            trade['result'] = 'StopGain'
-            trades.append(trade)
-            ganhos.append(profit - taxa_por_operacao)
+    #         trade['close_price'] = stopgain
+    #         trade['close_time'] = data['open_time'].iloc[i - 1]
+    #         trade['outcome'] = profit
+    #         trade['result'] = 'StopGain'
+    #         trades.append(trade)
+    #         ganhos.append(profit - taxa_por_operacao)
 
-            if saldo > max_saldo:
-                max_saldo = saldo
-                min_saldo_since_max = saldo
+    #         if saldo > max_saldo:
+    #             max_saldo = saldo
+    #             min_saldo_since_max = saldo
 
-            continue
+    #         continue
 
-    # if trade_status == Trade_Status.espera: 
-    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] > data['EMA_200'].iloc[i + 1]: 
+    if trade_status == Trade_Status.espera: 
+    # if trade_status == Trade_Status.espera and data['close'].iloc[i - 1] > data['EMA_200'].iloc[i - 1]: 
         if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
             open_price = data['high'].iloc[i + 1]
@@ -406,36 +406,36 @@ for i in range(len(data)-1000, -1,-1):
             }
             continue
 
-    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] < data['EMA_200'].iloc[i + 1]:
-        if emas.sell_double_ema_breakout(data.iloc[i:i+5], 'EMA_9', 'EMA_21'):
-            results[year][month]['open_trades'] += 1
-            open_price = data['low'].iloc[i + 1]
-            stoploss = StopLoss.set_buy_stoploss_max_candles(data.iloc[i:i + 15], 14)
-            if taxa_por_operacao != 0:
-                saldo -= saldo * taxa_por_operacao / 100
-            results[year][month]['saldo_final'] = saldo
-            ratio = 4.1
-            stopgain = StopGain.set_buy_stopgain_ratio(open_price, stoploss, ratio)
-            trade_status = Trade_Status.vendido
+    # if trade_status == Trade_Status.espera and data['close'].iloc[i - 1] < data['EMA_200'].iloc[i - 1]:
+    #     if emas.sell_double_ema_breakout(data.iloc[i - 5:i], 'EMA_9', 'EMA_21'):
+    #         results[year][month]['open_trades'] += 1
+    #         open_price = data['low'].iloc[i - 2]
+    #         stoploss = StopLoss.set_buy_stoploss_max_candles(data.iloc[i - 15:i], 14)
+    #         if taxa_por_operacao != 0:
+    #             saldo -= saldo * taxa_por_operacao / 100
+    #         results[year][month]['saldo_final'] = saldo
+    #         ratio = 4.1
+    #         stopgain = StopGain.set_buy_stopgain_ratio(open_price, stoploss, ratio)
+    #         trade_status = Trade_Status.vendido
 
-            # TODO: Validar as funções de cálculo percentual para a venda
-            loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
-            gain_percentage = utils.calculate_sell_gain_percentage(open_price, stopgain)
+    #         # TODO: Validar as funções de cálculo percentual para a venda
+    #         loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
+    #         gain_percentage = utils.calculate_sell_gain_percentage(open_price, stopgain)
 
-            # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
+    #         # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
 
-            trade = {
-                'type': 'sell',
-                'open_time': data['open_time'].iloc[i + 1],
-                'open_price': open_price,
-                'stoploss': stoploss,
-                'stopgain': stopgain,
-                'close_price': 0,
-                'close_time': 0,
-                'outcome': 0,
-                'result': ''
-            }
-            continue
+    #         trade = {
+    #             'type': 'sell',
+    #             'open_time': data['open_time'].iloc[i - 1],
+    #             'open_price': open_price,
+    #             'stoploss': stoploss,
+    #             'stopgain': stopgain,
+    #             'close_price': 0,
+    #             'close_time': 0,
+    #             'outcome': 0,
+    #             'result': ''
+    #         }
+    #         continue
 
 descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
 
@@ -541,4 +541,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-plot_trades(data, trades, pd.to_datetime(start_date))
+# plot_trades(data, trades, pd.to_datetime(start_date))
