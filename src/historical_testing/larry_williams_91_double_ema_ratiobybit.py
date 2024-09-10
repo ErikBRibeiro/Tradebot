@@ -83,6 +83,9 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     # reverse the order of the data
     df = df.iloc[::-1].reset_index(drop=True)
 
+    # Remover duplicatas, mantendo apenas a última entrada para cada 'open_time'
+    df = df.drop_duplicates(subset='open_time', keep='last')
+
     # print(df)
 
     return df

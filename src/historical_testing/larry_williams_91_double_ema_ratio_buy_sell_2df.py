@@ -78,10 +78,12 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df['high'] = df['high'].astype(float)
     df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
     df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
-    df['EMA_200'] = df['close'].ewm(span=200, adjust=False).mean()
 
     # reverse the order of the data
     df = df.iloc[::-1].reset_index(drop=True)
+
+    # Remover duplicatas, mantendo apenas a última entrada para cada 'open_time'
+    df = df.drop_duplicates(subset='open_time', keep='last')
 
     # print(df)
 
@@ -122,15 +124,12 @@ def plot_trades(data, trades, start_date):
     # Garantir que 'data' seja uma cópia completa do DataFrame (se estiver vindo de uma slice)
     data = data.copy()
 
-    # Adicionar uma coluna para a EMA 9 semanal no DataFrame de 15 minutos
-    data['EMA_9_weekly'] = data['open_time'].apply(lambda x: get_weekly_ema_9(x, data2))
-
     # Adicionar a EMA 9 semanal ao gráfico
     fig.add_trace(go.Scatter(
         x=data['open_time'],
-        y=data['EMA_9_weekly'],
+        y=data['EMA_9_previous'],
         mode='lines',
-        name='EMA 9 Semanal',
+        name='EMA 9 Semana Anterior',
         line=dict(color='rgb(0,114,163)', width=1)
     ))
 
@@ -200,31 +199,15 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     sharpe_ratio = mean_excess_return / std_excess_return if std_excess_return != 0 else 0
     return sharpe_ratio
 
-def get_weekly_ema_9(timestamp, data2):
-    # Converter o timestamp da vela de 15 minutos para o formato de datetime
-    candle_time = pd.to_datetime(timestamp)
-
-    # Filtrar a vela de data2 que corresponde à semana do candle_time
-    for i in range(len(data2)):
-        # Obter o tempo de início da vela semanal
-        start_week = pd.to_datetime(data2['open_time'].iloc[i])
-        
-        if i == len(data2) - 1:
-            # A última vela cobre até a data atual
-            end_week = datetime.now()
-        else:
-            # O final da semana é o início da próxima vela semanal
-            end_week = pd.to_datetime(data2['open_time'].iloc[i + 1])
-
-        # Verifica se o tempo da vela de 15m está dentro do intervalo da vela semanal
-        if start_week <= candle_time < end_week:
-            return data2['EMA_9'].iloc[i]
-
-    # Caso não seja encontrado, retornar None ou algum valor padrão
-    return None
+def get_week_start(timestamp):
+    # Converter para datetime se necessário
+    ts = pd.to_datetime(timestamp)
+    # Obter o início da semana (segunda-feira)
+    return ts - pd.to_timedelta(ts.weekday(), unit='D')
 
 # Configurações iniciais
-start_date = '2024-07-01'
+start_date = '2023-01-01'
+# end_date = '2023-12-30'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
@@ -237,10 +220,31 @@ if data.empty:
     print("No data available for the given period.")
     sys.exit()
 
-data2 = fetch_candles(ativo, 'w', adjusted_start_date, end_date)
+# Add 1 week before the start date to calculate the weekly EMA 9
+adjusted_start_date2 = (datetime.strptime(adjusted_start_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+
+data2 = fetch_candles(ativo, 'w', adjusted_start_date2, end_date)
 if data2.empty:
     print("No data available for the given period.")
     sys.exit()
+
+# Adicionar a coluna de início da semana no DataFrame de velas de 15 minutos
+data['week_start'] = data['open_time'].apply(get_week_start).dt.normalize()
+
+# Criar um DataFrame com o início da semana e a EMA 9 semanal
+weekly_ema = pd.DataFrame({
+    'week_start': data2['open_time'].apply(get_week_start).dt.normalize(),
+    'EMA_9': data2['EMA_9']
+})
+
+# Criar uma nova coluna que desloca a EMA 9 para a semana anterior
+weekly_ema['EMA_9_previous'] = weekly_ema['EMA_9'].shift(-1)
+
+# Fazer o merge do DataFrame de velas de 15 minutos com as EMAs semanais
+data = data.merge(weekly_ema[['week_start', 'EMA_9_previous']], on='week_start', how='left')
+
+# Verificar se as EMAs anteriores foram atribuídas corretamente
+# print(data[['open_time', 'week_start', 'EMA_9_previous']].head(20))
 
 saldo_inicial = 1000  # Saldo inicial em dólares
 saldo = saldo_inicial * alavancagem  # Ajustando o saldo para considerar a alavancagem
@@ -347,7 +351,7 @@ for i in range(len(data)-1000, -1,-1):
             continue
 
     if trade_status == Trade_Status.vendido:
-        if StopLoss.buy_stoploss(data['high'].iloc[i + 1], stoploss):
+        if StopLoss.buy_stoploss(data['high'].iloc[i], stoploss):
             loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
             results[year][month]['failed_trades'] += 1
             results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
@@ -358,7 +362,7 @@ for i in range(len(data)-1000, -1,-1):
             # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
-            trade['close_time'] = data['open_time'].iloc[i + 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = loss_percentage
             trade['result'] = 'StopLoss'
             trades.append(trade)
@@ -376,7 +380,7 @@ for i in range(len(data)-1000, -1,-1):
 
             continue
             
-        elif StopGain.buy_stopgain(data['low'].iloc[i + 1], stopgain):
+        elif StopGain.buy_stopgain(data['low'].iloc[i], stopgain):
             profit = utils.calculate_sell_gain_percentage(open_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
@@ -387,7 +391,7 @@ for i in range(len(data)-1000, -1,-1):
             # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
-            trade['close_time'] = data['open_time'].iloc[i + 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = profit
             trade['result'] = 'StopGain'
             trades.append(trade)
@@ -398,9 +402,9 @@ for i in range(len(data)-1000, -1,-1):
                 min_saldo_since_max = saldo
 
             continue
-
+    
     # if trade_status == Trade_Status.espera: 
-    if trade_status == Trade_Status.espera and  data['close'].iloc[i + 1] > get_weekly_ema_9(data['open_time'].iloc[i + 1], data2): 
+    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] > data['EMA_9_previous'].iloc[i + 1]: 
         if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
             open_price = data['high'].iloc[i + 1]
@@ -430,7 +434,7 @@ for i in range(len(data)-1000, -1,-1):
             }
             continue
 
-    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] < get_weekly_ema_9(data['open_time'].iloc[i + 1], data2):
+    if trade_status == Trade_Status.espera and data['close'].iloc[i + 1] < data['EMA_9_previous'].iloc[i + 1]: 
         if emas.sell_double_ema_breakout(data.iloc[i:i+5], 'EMA_9', 'EMA_21'):
             results[year][month]['open_trades'] += 1
             open_price = data['low'].iloc[i + 1]
@@ -461,7 +465,7 @@ for i in range(len(data)-1000, -1,-1):
             }
             continue
 
-descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
+descricao_setup = "EMA 5/15 rompimento, stopgain ratio " + str(ratio) + " e stoploss 17 candles. EMA 9 semanal para definição de compra ou venda."
 
 overall_sharpe_ratio = calculate_sharpe_ratio(np.array(ganhos + perdas), 0.15)
 

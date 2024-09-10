@@ -83,6 +83,9 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     # reverse the order of the data
     df = df.iloc[::-1].reset_index(drop=True)
 
+    # Remover duplicatas, mantendo apenas a última entrada para cada 'open_time'
+    df = df.drop_duplicates(subset='open_time', keep='last')
+
     # print(df)
 
     return df
@@ -194,7 +197,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2024-07-01'
+start_date = '2023-01-01'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
@@ -323,7 +326,7 @@ for i in range(len(data)-1000, -1,-1):
             continue
 
     if trade_status == Trade_Status.vendido:
-        if StopLoss.buy_stoploss(data['high'].iloc[i + 1], stoploss):
+        if StopLoss.buy_stoploss(data['high'].iloc[i], stoploss):
             loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
             results[year][month]['failed_trades'] += 1
             results[year][month]['perda_percentual_total'] += loss_percentage + taxa_por_operacao
@@ -334,7 +337,7 @@ for i in range(len(data)-1000, -1,-1):
             # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
-            trade['close_time'] = data['open_time'].iloc[i + 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = loss_percentage
             trade['result'] = 'StopLoss'
             trades.append(trade)
@@ -352,7 +355,7 @@ for i in range(len(data)-1000, -1,-1):
 
             continue
             
-        elif StopGain.buy_stopgain(data['low'].iloc[i + 1], stopgain):
+        elif StopGain.buy_stopgain(data['low'].iloc[i], stopgain):
             profit = utils.calculate_sell_gain_percentage(open_price, stopgain)
             results[year][month]['lucro'] += profit - taxa_por_operacao
             results[year][month]['successful_trades'] += 1
@@ -363,7 +366,7 @@ for i in range(len(data)-1000, -1,-1):
             # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
-            trade['close_time'] = data['open_time'].iloc[i + 1]
+            trade['close_time'] = data['open_time'].iloc[i]
             trade['outcome'] = profit
             trade['result'] = 'StopGain'
             trades.append(trade)
@@ -426,7 +429,7 @@ for i in range(len(data)-1000, -1,-1):
 
             trade = {
                 'type': 'sell',
-                'open_time': data['open_time'].iloc[i + 1],
+                'open_time': data['open_time'].iloc[i],
                 'open_price': open_price,
                 'stoploss': stoploss,
                 'stopgain': stopgain,
@@ -437,7 +440,7 @@ for i in range(len(data)-1000, -1,-1):
             }
             continue
 
-descricao_setup = "EMA 9/21 rompimento, stopgain ratio " + str(ratio) + " e stoploss 14 candles"
+descricao_setup = "EMA 5/15 rompimento, stopgain ratio " + str(ratio) + " e stoploss 17 candles. EMA 200 para definição de compra ou venda."
 
 overall_sharpe_ratio = calculate_sharpe_ratio(np.array(ganhos + perdas), 0.15)
 

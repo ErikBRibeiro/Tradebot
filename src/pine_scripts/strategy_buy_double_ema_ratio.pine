@@ -1,12 +1,12 @@
 //@version=5
-strategy("EMA Crossover with Buy-Only Strategy", overlay=true)
+strategy("EMA Breakout with Buy-Only Strategy", overlay=true)
 
 // Definindo as EMAs
 short_ema = ta.ema(close, 5)
 long_ema = ta.ema(close, 15)
 
 // Entrada de intervalo de datas
-startDate = input.time(timestamp("2024-01-01 00:00"), title="Start Date")
+startDate = input.time(timestamp("2023-03-01 00:00"), title="Start Date")
 endDate = input.time(timestamp("2024-09-03 00:00"), title="End Date")
 
 // Registro de trade
@@ -15,24 +15,26 @@ var float stop_loss = na
 var float take_profit = na
 var bool in_trade = false
 
-buy_signal_to_plot = (close[1] > short_ema and close[1] > long_ema and high > high[1]) and not in_trade
+reference_candle = (close > short_ema and close > long_ema)
+buy_signal = (close[1] > short_ema[1] and close[1] > long_ema[1] and high > high[1]) and not in_trade
 min_candles = ta.lowest(low, 17)
 
-if (not in_trade and buy_signal_to_plot and time >= startDate and time <= endDate)
+if (not in_trade and (close < short_ema or close < long_ema))
+    strategy.cancel_all()
+
+if (reference_candle and not in_trade and time >= startDate and time <= endDate)
+    strategy.cancel_all()
+    strategy.entry("Buy", strategy.long, stop=high+0.1)
+
+if (not in_trade and buy_signal and time >= startDate and time <= endDate)
     entry_price := high[1]
     stop_loss := min_candles  // Stop loss definido como a mínima das últimas 17 velas
     take_profit := entry_price + 4.1 * (entry_price - stop_loss) // Alvo de 4x o risco, baseado no novo stop_loss
     in_trade := true
     label.new(bar_index, low*0.9995, text="Buy", color=color.yellow, style=label.style_label_up)
 
-    // Iniciando uma nova posição de compra
-    strategy.entry("Buy", strategy.long, stop=entry_price)
-
     // Definindo o stop loss e take profit para a posição
     strategy.exit("Exit", from_entry="Buy", stop=stop_loss, limit=take_profit)
-
-// Marcando entradas no gráfico
-// plotshape(series=buy_signal_to_plot and time >= startDate and time <= endDate, location=location.belowbar, color=color.green, style=shape.labelup, text="Buy")
 
 // Atualizando o estado do trade
 if (in_trade and (low <= stop_loss or high >= take_profit))
@@ -46,6 +48,10 @@ if (in_trade and (low <= stop_loss or high >= take_profit))
     entry_price := na
     stop_loss := na
     take_profit := na
+
+    if (reference_candle and not in_trade and time >= startDate and time <= endDate)
+        strategy.cancel_all()
+        strategy.entry("Buy", strategy.long, stop=high+0.1)
 
 // Plotando as EMAs no gráfico
 plot(short_ema, color=color.blue, title="EMA 5")
