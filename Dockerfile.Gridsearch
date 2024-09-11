@@ -7,7 +7,7 @@ RUN mkdir /opt/notebooks && \
 
 WORKDIR /opt/notebooks
 
-COPY gridsearch.ipynb .
+COPY src/historical_testing/Gridsearch/gridsearch.ipynb .
 
 RUN ["/opt/conda/bin/jupyter", "nbconvert", "--to", "script", "gridsearch.ipynb" ]
 
@@ -18,16 +18,16 @@ LABEL Maintainer="TradeBot"
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY src/historical_testing/Gridsearch/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-COPY --from=anaconda-build /opt/notebooks/gridsearch.py .
+COPY --from=anaconda-build /opt/notebooks/gridsearch.py ./src/historical_testing/Gridsearch/gridsearch.py
 
 RUN mkdir data
 
 EXPOSE 8000
 
-CMD ["python3", "gridsearch.py"]
+CMD ["python3", "src/historical_testing/Gridsearch/gridsearch.py"]
