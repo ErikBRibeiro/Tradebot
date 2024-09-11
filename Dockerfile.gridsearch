@@ -23,10 +23,9 @@ COPY src/historical_testing/Gridsearch/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-
-COPY --from=anaconda-build /opt/notebooks/gridsearch.py ./src/historical_testing/Gridsearch/gridsearch.py
-
-RUN mkdir data
+# COPY src/utils.py src/historical_testing/Gridsearch/utils.py
+COPY --from=anaconda-build /opt/notebooks/gridsearch.py /app/src/historical_testing/Gridsearch/gridsearch.py
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
