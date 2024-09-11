@@ -2,7 +2,9 @@ import sys
 import os
 
 # Defina o caminho base manualmente
-base_path = os.path.abspath(os.path.join(os.getcwd(), '..', '..'))
+# base_path = os.path.abspath(os.path.join(os.getcwd(), '..', '..'))
+
+base_path = '/app/src'
 
 # Adicione o diretório base ao caminho de pesquisa de módulos
 sys.path.append(base_path)
@@ -36,8 +38,8 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Carregar os dados dos arquivos CSV
-df_15m = pd.read_csv('BTC_15m_candles.csv')
-df_5m = pd.read_csv('BTC_5m_candles.csv')
+df_15m = pd.read_csv('./src/historical_testing/Gridsearch/BTC_15m_candles.csv')
+df_5m = pd.read_csv('./src/historical_testing/Gridsearch/BTC_5m_candles.csv')
 
 # Padronizar os nomes das colunas para minúsculas e substituir espaços por underscores
 df_15m.columns = [col.lower().replace(' ', '_') for col in df_15m.columns]
@@ -61,11 +63,11 @@ df_5m = df_5m[(df_5m['open_time'] >= start_datetime) & (df_5m['open_time'] <= en
 
 # Definir os parâmetros e seus intervalos
 param_grid = {
-    'short_period': list(range(5, 10, 1)),
-    'long_period': list(range(44, 61, 1)),
-    'ratio': np.round(np.arange(1.0, 4.0, 0.1), 1).tolist(),
+    'short_period': list(range(5, 6, 1)),
+    'long_period': list(range(44, 45, 1)),
+    'ratio': np.round(np.arange(1.0, 1.1, 0.1), 1).tolist(),
     'timeframe': ['15m'],
-    'stop_candles': list(range(20, 30, 1)),
+    'stop_candles': list(range(20, 21, 1)),
     'ativo': ['BTCUSDT'],
     'setup': ['EMA']
 }
@@ -122,7 +124,7 @@ if best_result:
             print(f"  Ganho médio por trade: 0")
         print(f"  Trades em prejuízo: {sum([results[year][month]['failed_trades'] for month in results[year]])}")
         print(f"  Soma das perdas: {sum([results[year][month]['perda_percentual_total'] for month in results[year]]):.2f}%")
-        
+
         total_loss = sum([results[year][month]['perda_percentual_total'] for month in results[year]])
         total_failed_trades = sum([results[year][month]['failed_trades'] for month in results[year]])
 
@@ -132,12 +134,12 @@ if best_result:
             avg_loss_per_trade = 0
 
         print(f"  Perda média por trade: {avg_loss_per_trade:.2f}%")
-        
+
         if results[year][list(results[year].keys())[0]]['saldo_inicial'] <= results[year][list(results[year].keys())[-1]]['saldo_final']:
             print(f"  Resultado final: {((results[year][list(results[year].keys())[-1]]['saldo_final'] / results[year][list(results[year].keys())[0]]['saldo_inicial']) - 1) * 100:.2f}%")
         else:
             print(f"  Resultado final: {((1 - (results[year][list(results[year].keys())[-1]]['saldo_final'] / results[year][list(results[year].keys())[0]]['saldo_inicial'])) * -1) * 100:.2f}%")
-        
+
         print(f"  Saldo inicial: {results[year][list(results[year].keys())[0]]['saldo_inicial']:.2f}")
         print(f"  Saldo final: {results[year][list(results[year].keys())[-1]]['saldo_final']:.2f}")
         print("Detalhes:")
@@ -152,7 +154,7 @@ if best_result:
                 print(f"    Ganho médio por trade: 0")
             print(f"    Trades em prejuízo: {results[year][month]['failed_trades']}")
             print(f"    Soma das perdas: {results[year][month]['perda_percentual_total']:.2f}%")
-            
+
             failed_trades = results[year][month]['failed_trades']
 
             if failed_trades != 0:
