@@ -1,6 +1,6 @@
-FROM python:3.9-alpine
+FROM python:3.10-slim
 
-LABEL Maintainer="Valmir Barbosa"
+LABEL Maintainer="TradeBot"
 
 WORKDIR /app
 
