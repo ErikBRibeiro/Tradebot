@@ -76,8 +76,8 @@ def fetch_candles(symbol, interval, start_str, end_str=None):
     df['close'] = df['close'].astype(float)
     df['low'] = df['low'].astype(float)
     df['high'] = df['high'].astype(float)
-    df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
-    df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
+    df['EMA_5'] = df['close'].ewm(span=5, adjust=False).mean()
+    df['EMA_15'] = df['close'].ewm(span=15, adjust=False).mean()
     df['EMA_200'] = df['close'].ewm(span=200, adjust=False).mean()
 
     # reverse the order of the data
@@ -110,14 +110,14 @@ def plot_trades(data, trades, start_date):
 
     fig.add_trace(go.Scatter(
         x=data['open_time'],
-        y=data['EMA_9'],
+        y=data['EMA_5'],
         mode='lines',
         name='EMA 9',
         line=dict(color='yellow', width=1)
     ))
     fig.add_trace(go.Scatter(
         x=data['open_time'],
-        y=data['EMA_21'],
+        y=data['EMA_15'],
         mode='lines',
         name='EMA 21',
         line=dict(color='rgb(148,0,211)', width=1)
@@ -197,7 +197,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2024-07-01'
+start_date = '2024-01-31'
 end_date = datetime.now().strftime('%Y-%m-%d')
 adjusted_start_date = adjust_date(start_date)
 
@@ -218,8 +218,8 @@ if data.empty:
 # data2['close'] = data2['close'].astype(float)
 # data2['low'] = data2['low'].astype(float)
 # data2['high'] = data2['high'].astype(float)
-# data2['EMA_9'] = data2['close'].ewm(span=9, adjust=False).mean()
-# data2['EMA_21'] = data2['close'].ewm(span=21, adjust=False).mean()
+# data2['EMA_5'] = data2['close'].ewm(span=5, adjust=False).mean()
+# data2['EMA_15'] = data2['close'].ewm(span=15, adjust=False).mean()
 
 saldo_inicial = 1000  # Saldo inicial em dólares
 saldo = saldo_inicial * alavancagem  # Ajustando o saldo para considerar a alavancagem
@@ -380,14 +380,14 @@ for i in range(len(data)-1000, -1,-1):
 
     if trade_status == Trade_Status.espera: 
     # if trade_status == Trade_Status.espera and data['close'].iloc[i - 1] > data['EMA_200'].iloc[i - 1]: 
-        if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_9', 'EMA_21'):
+        if emas.buy_double_ema_breakout(data.iloc[i:i + 5], 'EMA_5', 'EMA_15'):
             results[year][month]['open_trades'] += 1
             open_price = data['high'].iloc[i + 1]
-            stoploss = StopLoss.set_sell_stoploss_min_candles(data.iloc[i:i + 15], 14)
+            stoploss = StopLoss.set_sell_stoploss_min_candles(data.iloc[i:i + 21], 17)
             if taxa_por_operacao != 0:
                 saldo -= saldo * taxa_por_operacao / 100
             results[year][month]['saldo_final'] = saldo
-            ratio = 3.5
+            ratio = 4.1
             stopgain = StopGain.set_sell_stopgain_ratio(open_price, stoploss, ratio)
             trade_status = Trade_Status.comprado
 
@@ -410,7 +410,7 @@ for i in range(len(data)-1000, -1,-1):
             continue
 
     # if trade_status == Trade_Status.espera and data['close'].iloc[i - 1] < data['EMA_200'].iloc[i - 1]:
-    #     if emas.sell_double_ema_breakout(data.iloc[i - 5:i], 'EMA_9', 'EMA_21'):
+    #     if emas.sell_double_ema_breakout(data.iloc[i - 5:i], 'EMA_5', 'EMA_15'):
     #         results[year][month]['open_trades'] += 1
     #         open_price = data['low'].iloc[i - 2]
     #         stoploss = StopLoss.set_buy_stoploss_max_candles(data.iloc[i - 15:i], 14)
@@ -544,4 +544,4 @@ print("-------------------")
 print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Teste finalizado: {ativo} - {timeframe}.")
 print(f"Setup: {descricao_setup}")
 
-# plot_trades(data, trades, pd.to_datetime(start_date))
+plot_trades(data, trades, pd.to_datetime(start_date))

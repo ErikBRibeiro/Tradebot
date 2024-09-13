@@ -1,5 +1,5 @@
 //@version=5
-strategy("EMA Breakout with Buy-Only Strategy", overlay=true)
+strategy("EMA Breakout with Buy-Only Strategy", max_labels_count = 500, overlay=true)
 
 // Definindo as EMAs
 short_ema = ta.ema(close, 5)
