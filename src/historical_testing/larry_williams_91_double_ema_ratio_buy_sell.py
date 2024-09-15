@@ -183,11 +183,11 @@ def plot_trades(data, trades, start_date):
 
     fig.show()
 
-def adjust_date(start_date):
+def adjust_date(start_date, num_candles=999):
     start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
-    days_to_subtract = 10.40625
-    new_datetime = start_datetime - timedelta(days=days_to_subtract)
-    return new_datetime.strftime('%Y-%m-%d')
+    min_to_subtract = num_candles * 15
+    new_datetime = start_datetime - timedelta(minutes=min_to_subtract)
+    return new_datetime.strftime('%Y-%m-%d %H:%M')
 
 def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     excess_returns = returns - risk_free_rate
@@ -197,9 +197,10 @@ def calculate_sharpe_ratio(returns, risk_free_rate=0.05):
     return sharpe_ratio
 
 # Configurações iniciais
-start_date = '2023-01-01'
+start_date = '2024-02-02'
 end_date = datetime.now().strftime('%Y-%m-%d')
-adjusted_start_date = adjust_date(start_date)
+skip_candles = 999
+adjusted_start_date = adjust_date(start_date, skip_candles)
 
 ativo = 'BTCUSDT'
 timeframe = '15'
@@ -209,17 +210,6 @@ data = fetch_candles(ativo, timeframe, adjusted_start_date, end_date)
 if data.empty:
     print("No data available for the given period.")
     sys.exit()
-
-# data2 = fetch_candles(ativo, '1d', adjusted_start_date, end_date)
-# if data2.empty:
-#     print("No data available for the given period.")
-#     sys.exit()
-#
-# data2['close'] = data2['close'].astype(float)
-# data2['low'] = data2['low'].astype(float)
-# data2['high'] = data2['high'].astype(float)
-# data2['EMA_9'] = data2['close'].ewm(span=9, adjust=False).mean()
-# data2['EMA_21'] = data2['close'].ewm(span=21, adjust=False).mean()
 
 saldo_inicial = 1000  # Saldo inicial em dólares
 saldo = saldo_inicial * alavancagem  # Ajustando o saldo para considerar a alavancagem
@@ -246,7 +236,7 @@ trade_status = Trade_Status.espera
 results = {}
 trades = []
 
-for i in range(len(data)-1000, -1,-1):
+for i in range(len(data) - 1 - skip_candles, -1,-1):
     year = data['open_time'].iloc[i].year
     month = data['open_time'].iloc[i].month
 
@@ -273,7 +263,7 @@ for i in range(len(data)-1000, -1,-1):
             results[year][month]['saldo_final'] = saldo
             trade_status = Trade_Status.espera
             
-            # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
+            # print(f"{data['open_time'].iloc[i]} - VENDEMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
             trade['close_time'] = data['open_time'].iloc[i]
@@ -309,7 +299,7 @@ for i in range(len(data)-1000, -1,-1):
             results[year][month]['saldo_final'] = saldo
             trade_status = Trade_Status.espera
 
-            # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
+            # print(f"{data['open_time'].iloc[i]} - VENDEMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
             trade['close_time'] = data['open_time'].iloc[i]
@@ -334,7 +324,7 @@ for i in range(len(data)-1000, -1,-1):
             results[year][month]['saldo_final'] = saldo
             trade_status = Trade_Status.espera
             
-            # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
+            # print(f"{data['open_time'].iloc[i]} - COMPRAMOS a {round(stoploss, 2)} com PREJUÍZO de {round(loss_percentage, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stoploss
             trade['close_time'] = data['open_time'].iloc[i]
@@ -363,7 +353,7 @@ for i in range(len(data)-1000, -1,-1):
             results[year][month]['saldo_final'] = saldo
             trade_status = Trade_Status.espera
 
-            # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
+            # print(f"{data['open_time'].iloc[i]} - COMPRAMOS a {round(stopgain, 2)} com LUCRO de {round(profit, 2)}% indo para {round(saldo, 2)} de saldo")
 
             trade['close_price'] = stopgain
             trade['close_time'] = data['open_time'].iloc[i]
@@ -394,7 +384,7 @@ for i in range(len(data)-1000, -1,-1):
             loss_percentage = utils.calculate_loss_percentage(open_price, stoploss)
             gain_percentage = utils.calculate_gain_percentage(open_price, stopgain)
 
-            # print(f"{data['open_time'].iloc[i - 1]} - COMPRAMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
+            # print(f"{data['open_time'].iloc[i]} - COMPRAMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
 
             trade = {
                 'type': 'buy',
@@ -425,7 +415,7 @@ for i in range(len(data)-1000, -1,-1):
             loss_percentage = utils.calculate_sell_loss_percentage(open_price, stoploss)
             gain_percentage = utils.calculate_sell_gain_percentage(open_price, stopgain)
 
-            # print(f"{data['open_time'].iloc[i - 1]} - VENDEMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
+            # print(f"{data['open_time'].iloc[i]} - VENDEMOS a {round(open_price, 2)} com stoploss em {round(stoploss, 2)} ({round(loss_percentage, 2)}% de perda) e stopgain em {round(stopgain, 2)} ({round(gain_percentage, 2)}% de ganho)")
 
             trade = {
                 'type': 'sell',
